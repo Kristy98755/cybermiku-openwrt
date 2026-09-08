@@ -1014,7 +1014,7 @@ var CMK = {
 				var liveCheck = Promise.resolve(false);
 				if (staIface && staIfname) {
 					liveCheck = self.rpc('iwinfo', 'info', { device: staIfname }).then(function(inf) {
-						var row = (inf && inf.length) ? inf[0] : null;
+						var row = (inf && typeof inf === 'object') ? inf : null;
 						if (!row) return false;
 						var ap = String(row.accesspoint || '');
 						if (!/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(ap) || ap === '00:00:00:00:00:00') return false;
@@ -1030,7 +1030,7 @@ var CMK = {
 					var dumps = (r[3] && r[3].interface) ? r[3].interface : (Array.isArray(r[3]) ? r[3] : []);
 					dumps.forEach(function(it) {
 						var addrs = (it && (it['ipv4-address'] || it.ipv4_address)) || [];
-						if (it && it.interface === 'wwan' && addrs.length) {
+						if (it && addrs.length && (it.interface === 'wwan' || it.l3_device === staIfname)) {
 							wwanIp = addrs[0].address || '';
 						}
 					});
@@ -1042,7 +1042,7 @@ var CMK = {
 					repH += '<div class="cmk-grid">';
 					repH += self.statCard('STATUS', state, cls);
 					repH += self.statCard('REMOTE SSID', staIface ? self.esc(staSSID) : 'None');
-					repH += self.statCard('REMOTE IFACE', staIface ? self.esc(staIfname || 'wwan') : '-');
+					repH += self.statCard('REMOTE IFACE', staIface ? self.esc(staIfname || '-') : '-');
 					repH += self.statCard('REMOTE IP', wwanIp || '-');
 					repH += '</div>';
 					repH += '<p style="color:var(--text-dim);margin-top:15px;font-size:0.8rem">' +
