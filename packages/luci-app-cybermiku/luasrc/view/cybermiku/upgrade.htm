@@ -1,0 +1,65 @@
+<%+header%>
+
+<div class="cyber-panel">
+	<h2><%:Firmware Upgrade%></h2>
+	<p class="cyber-desc"><%:Upload a sysupgrade firmware image to update the device.%></p>
+
+	<div class="cyber-form">
+		<form method="post" action="<%=luci.dispatcher.build_url("admin", "cybermiku", "api", "upgrade")%"
+		      enctype="multipart/form-data" id="upgrade-form">
+			<div class="cyber-upload">
+				<label class="cyber-upload-label">
+					<input type="file" name="firmware" accept=".bin,.img" id="firmware-file" required>
+					<span class="cyber-upload-text"><%:Select firmware file...%></span>
+				</label>
+				<div id="file-name" class="cyber-file-name"></div>
+			</div>
+			<div class="cyber-actions">
+				<button type="submit" class="cyber-btn cyber-btn-danger" id="upgrade-btn" disabled>
+					<%:UPLOAD & FLASH%>
+				</button>
+			</div>
+		</form>
+	</div>
+
+	<div id="upgrade-status" class="cyber-status" style="display:none;"></div>
+
+	<div class="cyber-info">
+		<h3><%:Current Firmware%></h3>
+		<p><%:Version%>: <%= sys.exec("cat /etc/openwrt_release 2>/dev/null"):match("DISTRIB_DESCRIPTION='(.-)'") or "OpenWrt" %></p>
+		<p><%:Target%>: <%= sys.exec("cat /etc/openwrt_release 2>/dev/null"):match("DISTRIB_TARGET='(.-)'") or "unknown" %></p>
+	</div>
+</div>
+
+<script>
+document.getElementById('firmware-file').addEventListener('change', function(e) {
+	var fileName = e.target.files[0] ? e.target.files[0].name : '';
+	document.getElementById('file-name').textContent = fileName;
+	document.getElementById('upgrade-btn').disabled = !fileName;
+});
+
+document.getElementById('upgrade-form').addEventListener('submit', function(e) {
+	e.preventDefault();
+	if (!confirm('<%:WARNING: Flashing wrong firmware may brick your device! Continue?%>')) return;
+
+	var status = document.getElementById('upgrade-status');
+	status.style.display = 'block';
+	status.textContent = '<%:Uploading firmware...%>';
+	status.className = 'cyber-status status-warning';
+
+	var formData = new FormData(this);
+	fetch(this.action, { method: 'POST', body: formData })
+		.then(r => r.text())
+		.then(msg => {
+			status.textContent = '<%:Firmware uploaded. Device will reboot...%>';
+			status.className = 'cyber-status status-info';
+			setTimeout(() => { location.reload(); }, 60000);
+		})
+		.catch(() => {
+			status.textContent = '<%:Upload failed. Please try again.%>';
+			status.className = 'cyber-status status-error';
+		});
+});
+</script>
+
+<%+footer%>

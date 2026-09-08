@@ -1,0 +1,83 @@
+{
+	"cybermiku": {
+		"description": "Grant full access for CyberMiku SPA dashboard",
+		"read": {
+			"cgi-io": [ "exec", "backup", "download" ],
+			"file": {
+				"/": [ "list" ],
+				"/*": [ "list", "read" ],
+			"/bin/dmesg -r": [ "exec" ],
+			"/bin/opkg": [ "exec" ],
+			"/bin/ping": [ "exec" ],
+				"/bin/ping6": [ "exec", "list" ],
+				"/bin/traceroute": [ "exec" ],
+				"/bin/traceroute6": [ "exec" ],
+				"/etc/crontabs/root": [ "read" ],
+				"/etc/dropbear/authorized_keys": [ "read" ],
+				"/etc/rc.local": [ "read" ],
+				"/sbin/ip -[46] neigh show": [ "exec" ],
+				"/sbin/ip -[46] route show table all": [ "exec" ],
+				"/sbin/ip -[46] rule show": [ "exec" ],
+			"/usr/bin/nslookup": [ "exec" ],
+			"/usr/bin/logread": [ "exec" ],
+			"/sbin/logread": [ "exec" ],
+			"/usr/bin/ping": [ "exec" ],
+				"/usr/bin/ping6": [ "exec", "list" ],
+				"/usr/bin/traceroute": [ "exec" ],
+				"/usr/bin/traceroute6": [ "exec", "list" ],
+				"/usr/libexec/syslog-wrapper": [ "exec" ],
+				"/usr/sbin/nft --terse --json list ruleset": [ "exec" ],
+				"/usr/sbin/iptables --line-numbers -w -nvxL -t *": [ "exec" ],
+				"/usr/sbin/ip6tables --line-numbers -w -nvxL -t *": [ "exec" ],
+				"/etc/init.d/firewall restart": [ "exec" ]
+			},
+			"ubus": {
+				"file": [ "list", "read", "stat", "exec" ],
+				"hostapd.*": [ "get_clients", "status" ],
+				"iwinfo": [ "info", "freqlist", "scan", "assoclist", "txpowerlist", "countrylist" ],
+				"luci": [ "getVersion", "getConntrackList", "getProcessList", "getInitList", "getLocaltime", "getTimezones", "getLEDs", "getUSBDevices", "getFeatures", "getRealtimeStats", "getSwconfigFeatures", "getSwconfigPortState", "getMountPoints", "getBlockDevices", "getConntrackHelpers", "getBuiltinEthernetPorts" ],
+				"luci-rpc": [ "getBoardJSON", "getDHCPLeases", "getHostHints", "getNetworkDevices", "getWirelessDevices", "getDUIDHints" ],
+				"log": [ "read", "write" ],
+				"network": [ "get_proto_handlers" ],
+				"network.interface": [ "dump" ],
+				"network.wireless": [ "status" ],
+				"rc": [ "list" ],
+				"service": [ "list", "state" ],
+				"system": [ "board", "info", "reboot", "validate_firmware_image" ]
+			},
+			"uci": [ "luci", "system", "network", "wireless", "dhcp", "firewall", "dropbear", "uhttpd", "fstab" ]
+		},
+		"write": {
+			"cgi-io": [ "upload", "exec" ],
+			"file": {
+				"/etc/luci-uploads/*": [ "write" ],
+				"/etc/crontabs/root": [ "write" ],
+				"/etc/init.d/cron reload": [ "exec" ],
+				"/etc/init.d/dnsmasq restart": [ "exec" ],
+				"/etc/init.d/firewall reload": [ "exec" ],
+				"/etc/init.d/firewall restart": [ "exec" ],
+				"/sbin/ifup": [ "exec" ],
+				"/sbin/ifdown": [ "exec" ],
+				"/sbin/wifi": [ "exec" ],
+				"/sbin/wifi reload": [ "exec" ],
+				"/sbin/wifi config": [ "exec" ],
+				"/sbin/reboot": [ "exec" ],
+				"/bin/kill": [ "exec" ]
+			},
+			"ubus": {
+				"file": [ "write", "exec", "remove" ],
+				"hostapd.*": [ "del_client", "wps_start", "wps_cancel", "wps_status" ],
+				"iwinfo": [ "scan" ],
+				"luci": [ "setPassword", "setLocaltime", "setBlockDetect", "setInitAction" ],
+				"network": [ "restart", "reload" ],
+				"network.interface": [ "up", "down" ],
+				"network.wireless": [ "up", "down", "set" ],
+				"rc": [ "init" ],
+				"service": [ "reload" ],
+				"system": [ "reboot", "validate_firmware_image" ],
+				"uci": [ "add", "apply", "confirm", "delete", "order", "rename", "set", "commit", "rollback", "revert", "reload_config" ]
+			},
+			"uci": [ "luci", "system", "network", "wireless", "dhcp", "firewall", "dropbear", "uhttpd", "fstab" ]
+		}
+	}
+}

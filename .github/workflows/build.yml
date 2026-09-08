@@ -1,0 +1,82 @@
+name: CyberMiku firmware build + release
+
+on:
+  push:
+    branches: ["main", "master"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  OPENWRT_DIR: /work/openwrt
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential clang bison flex g++ gettext texinfo ncurses-dev \
+            zlib1g-dev libssl-dev python3 python3-pip python3-dev unzip file \
+            wget rsync svn cmake ninja-build gawk bc git ca-certificates \
+            xxd perl-base libtool-bin autoconf automake make
+
+      - name: Bootstrap and build firmware
+        run: |
+          mkdir -p "${{ env.OPENWRT_DIR }}"
+          OPENWRT_DIR="${{ env.OPENWRT_DIR }}" bash scripts/build.sh
+        env:
+          PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+      - name: Collect and verify artifacts
+        id: out
+        run: |
+          set -euo pipefail
+          cd "${{ env.OPENWRT_DIR }}"
+          BIN="openwrt-ath79-generic-tplink_tl-wr841hp-v3"
+          mkdir -p dist
+          cp "bin/targets/ath79/generic/${BIN}-squashfs-factory.bin" \
+             "bin/targets/ath79/generic/${BIN}-squashfs-sysupgrade.bin" \
+             "bin/targets/ath79/generic/${BIN}.manifest" dist/
+          (cd dist && sha256sum ./*.bin ./"${BIN}.manifest") > dist/sha256sums.txt
+          # hard limit for 8MB flash (2x 128KB bootloader reserve)
+          SIZE=$(stat -c%s "dist/${BIN}-squashfs-factory.bin")
+          echo "factory size: ${SIZE}"
+          [ "$SIZE" -le 8126464 ]
+          echo "bin_dir=${{ env.OPENWRT_DIR }}/dist" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybermiku-firmware
+          path: |
+            ${{ env.OPENWRT_DIR }}/dist/*.bin
+            ${{ env.OPENWRT_DIR }}/dist/*.manifest
+            ${{ env.OPENWRT_DIR }}/dist/sha256sums.txt
+
+      - name: Publish release (auto, on every deploy)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          cd "${{ env.OPENWRT_DIR }}/dist"
+          TAG="ci-build"
+          if gh release view "$TAG" --json tagName -q .tagName >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes
+          fi
+          gh release create "$TAG" \
+            "openwrt-ath79-generic-tplink_tl-wr841hp-v3-squashfs-factory.bin" \
+            "openwrt-ath79-generic-tplink_tl-wr841hp-v3-squashfs-sysupgrade.bin" \
+            "openwrt-ath79-generic-tplink_tl-wr841hp-v3.manifest" \
+            "sha256sums.txt" \
+            --title "CyberMiku firmware :: auto release" \
+            --notes "Automated build of commit ${GITHUB_SHA}. Flash the **sysupgrade** image via LuCI or CLI." \
+            --latest

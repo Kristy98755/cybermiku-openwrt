@@ -1,0 +1,25 @@
+#!/bin/sh
+
+# Set default hostname
+uci set system.@system[0].hostname='cybermiku'
+
+# Enable WiFi by default
+uci set wireless.radio0.disabled='0'
+
+# Set default WiFi SSID
+uci set wireless.default_radio0.ssid='Miku Hiding in Your Wi-Fi'
+
+# Set WiFi to WPA2 by default
+uci set wireless.default_radio0.encryption='psk2'
+uci set wireless.default_radio0.key='changeme123'
+
+# Set timezone to Moscow
+uci set system.@system[0].timezone='MSK-3'
+
+# Remove Lua SGI prefix so /cgi-bin/luci uses ucode dispatcher (same theme as /)
+uci delete uhttpd.main.lua_prefix 2>/dev/null
+
+# Save changes
+uci commit
+
+echo "CyberMiku initial configuration applied."

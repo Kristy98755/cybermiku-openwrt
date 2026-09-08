@@ -1,0 +1,68 @@
+<%+header%>
+
+<div class="cyber-panel">
+	<h2><%:System Information%></h2>
+	<div class="cyber-grid">
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:Hostname%></div>
+			<div class="cyber-stat-value"><%= sys.exec("uci get system.@system[0].hostname"):match("^%s*(.-)%s*$") or "OpenWrt" %></div>
+		</div>
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:Model%></div>
+			<div class="cyber-stat-value">TP-Link TL-WR841HP</div>
+		</div>
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:Uptime%></div>
+			<div class="cyber-stat-value"><%= self.uptime %></div>
+		</div>
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:Kernel%></div>
+			<div class="cyber-stat-value"><%= self.kernel %></div>
+		</div>
+	</div>
+</div>
+
+<div class="cyber-panel">
+	<h2><%:Network Status%></h2>
+	<div class="cyber-grid">
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:WAN IP%></div>
+			<div class="cyber-stat-value" id="wan-ip"><%:Loading...%></div>
+		</div>
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:WAN Status%></div>
+			<div class="cyber-stat-value" id="wan-status"><%:Loading...%></div>
+		</div>
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:WiFi Status%></div>
+			<div class="cyber-stat-value" id="wifi-status"><%:Loading...%></div>
+		</div>
+		<div class="cyber-stat">
+			<div class="cyber-stat-label"><%:Clients%></div>
+			<div class="cyber-stat-value" id="client-count"><%:Loading...%></div>
+		</div>
+	</div>
+</div>
+
+<script>
+function refreshStatus() {
+	fetch('<%=luci.dispatcher.build_url("admin", "cybermiku", "api", "status")%>')
+		.then(r => r.json())
+		.then(d => {
+			document.getElementById('wan-ip').textContent = d.wan_ip || 'N/A';
+			document.getElementById('wan-status').textContent = d.wan_up ? 'UP' : 'DOWN';
+			document.getElementById('wan-status').className = 'cyber-stat-value ' + (d.wan_up ? 'status-up' : 'status-down');
+			document.getElementById('wifi-status').textContent = d.wifi_up ? 'ON' : 'OFF';
+			document.getElementById('wifi-status').className = 'cyber-stat-value ' + (d.wifi_up ? 'status-up' : 'status-down');
+		});
+	fetch('<%=luci.dispatcher.build_url("admin", "cybermiku", "api", "clients")%>')
+		.then(r => r.json())
+		.then(d => {
+			document.getElementById('client-count').textContent = d.length;
+		});
+}
+refreshStatus();
+setInterval(refreshStatus, 5000);
+</script>
+
+<%+footer%>

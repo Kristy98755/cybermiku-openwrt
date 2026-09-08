@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <filter id="neon">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Leek body -->
+  <path d="M32 58 Q30 40 28 25 Q27 18 30 12 Q32 8 34 12 Q37 18 Q36 25 34 40 Z" 
+        stroke="#00ff88" stroke-width="1.5" fill="rgba(0,255,136,0.15)" filter="url(#neon)"/>
+  <!-- Leek tip -->
+  <path d="M30 12 Q31 6 32 2 Q33 6 34 12" stroke="#00ff88" stroke-width="1" fill="rgba(0,255,136,0.1)" filter="url(#neon)"/>
+  <!-- Headphones -->
+  <circle cx="32" cy="42" r="12" stroke="#00ffff" stroke-width="1" fill="none" opacity="0.3"/>
+  <rect x="18" y="36" width="4" height="12" rx="2" fill="#00ffff" opacity="0.4"/>
+  <rect x="42" y="36" width="4" height="12" rx="2" fill="#00ffff" opacity="0.4"/>
+</svg>

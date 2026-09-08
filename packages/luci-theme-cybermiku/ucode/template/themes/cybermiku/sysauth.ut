@@ -1,0 +1,288 @@
+{% include('header', { blank_page: true }) %}
+
+<style>
+	body, body.luci {
+		background: #050508;
+	}
+
+	body::before { display: none; }
+
+	header, footer, #maincontent, noscript, #tabmenu, #view, .spinning {
+		display: none;
+	}
+
+	.login-split {
+		position: fixed;
+		top: 0; left: 0; right: 0; bottom: 0;
+		display: flex;
+	}
+
+	.login-left {
+		width: 60%;
+		height: 100%;
+		overflow: hidden;
+		position: relative;
+	}
+
+	.login-left img {
+		position: absolute;
+		top: 0; left: 50%;
+		height: 100%;
+		transform: translateX(-50%);
+		object-fit: cover;
+	}
+
+	.login-divider {
+		width: 2px;
+		height: 100%;
+		background: #00ffff;
+		box-shadow: 0 0 10px rgba(0, 255, 255, 0.6), 0 0 30px rgba(0, 255, 255, 0.3), 0 0 60px rgba(0, 255, 255, 0.1);
+		flex-shrink: 0;
+	}
+
+	.login-right {
+		width: 40%;
+		height: 100%;
+		overflow: hidden;
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.login-right-bg {
+		position: absolute;
+		top: 0; left: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: fill;
+	}
+
+	.login-box {
+		position: relative;
+		z-index: 1;
+		text-align: center;
+		padding: 40px 30px;
+		width: 100%;
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		background: rgba(5, 5, 8, 0.25);
+		backdrop-filter: blur(50px);
+		-webkit-backdrop-filter: blur(50px);
+		box-sizing: border-box;
+	}
+
+	.login-box h1 {
+		font-family: 'Orbitron', 'Courier New', monospace;
+		color: #00ffff;
+		letter-spacing: 8px;
+		font-size: 2.2rem;
+		margin: 0 0 8px 0;
+		text-shadow: 0 0 25px rgba(0,255,255,0.5), 0 0 50px rgba(0,255,255,0.2), 0 2px 4px rgba(0,0,0,0.8);
+	}
+
+	.login-box .subtitle {
+		color: #00e5e5;
+		font-size: 1rem;
+		letter-spacing: 5px;
+		text-transform: uppercase;
+		text-shadow: 0 0 12px rgba(0,255,255,0.6), 0 0 30px rgba(0,255,255,0.2), 0 1px 3px rgba(0,0,0,0.8);
+	}
+
+	.login-box .neon-line {
+		height: 1px;
+		background: linear-gradient(90deg, transparent, #00ffff, transparent);
+		box-shadow: 0 0 10px rgba(0,255,255,0.5);
+		margin: 20px 0;
+	}
+
+	.login-box .miku-tag {
+		color: #39c5bb;
+		font-size: 0.85rem;
+		letter-spacing: 2px;
+		margin-bottom: 25px;
+		text-shadow: 0 0 8px rgba(57,197,187,0.4), 0 1px 3px rgba(0,0,0,0.8);
+	}
+
+	.login-box .miku-tag .leek {
+		color: #00ff88;
+		text-shadow: 0 0 8px rgba(0,255,136,0.5), 0 1px 3px rgba(0,0,0,0.8);
+	}
+
+	.login-box form {
+		text-align: left;
+	}
+
+	.login-box label {
+		color: #00ffff;
+		font-family: 'Share Tech Mono', monospace;
+		letter-spacing: 2px;
+		text-transform: uppercase;
+		font-size: 0.7rem;
+		display: block;
+		margin-bottom: 5px;
+		text-shadow: 0 0 6px rgba(0,255,255,0.3), 0 1px 2px rgba(0,0,0,0.8);
+	}
+
+	.login-box input[type="text"], .login-box input[type="password"] {
+		background: rgba(0, 0, 0, 0.4);
+		border: 1px solid rgba(0, 255, 255, 0.3);
+		color: #e0e0e8;
+		padding: 12px 14px;
+		border-radius: 0;
+		width: 100%;
+		font-family: 'Share Tech Mono', monospace;
+		font-size: 1rem;
+		margin-bottom: 15px;
+		box-sizing: border-box;
+		outline: none;
+	}
+
+	.login-box input:focus {
+		border-color: #00ffff;
+		box-shadow: 0 0 15px rgba(0,255,255,0.3), inset 0 0 5px rgba(0,255,255,0.05);
+	}
+
+	.login-box button, .login-box .btn {
+		background: rgba(0, 255, 255, 0.08);
+		border: 1px solid #00ffff;
+		color: #00ffff;
+		text-transform: uppercase;
+		letter-spacing: 4px;
+		font-family: 'Share Tech Mono', monospace;
+		font-size: 0.9rem;
+		padding: 14px 0;
+		width: 100%;
+		cursor: pointer;
+		transition: all 0.3s;
+		border-radius: 0;
+		box-shadow: 0 0 15px rgba(0,255,255,0.1), inset 0 0 15px rgba(0,255,255,0.05);
+	}
+
+	.login-box button:hover, .login-box .btn:hover {
+		background: #00ffff;
+		color: #050508;
+		box-shadow: 0 0 25px rgba(0,255,255,0.5), 0 0 50px rgba(0,255,255,0.2);
+	}
+
+	.login-box .footer-text {
+		margin-top: 25px;
+		color: #e0e0e8;
+		font-size: 0.8rem;
+		letter-spacing: 2px;
+		text-shadow: 0 0 6px rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.8);
+	}
+
+	.login-box .footer-text .miku {
+		color: #e94196;
+	}
+
+	.alert-message.error {
+		background: rgba(255, 64, 96, 0.1);
+		border: 1px solid rgba(255, 64, 96, 0.3);
+		color: #ff4060;
+		border-radius: 0;
+		margin-bottom: 15px;
+		padding: 10px;
+		text-align: center;
+	}
+
+	.login-box .icon {
+		width: 280px;
+		height: auto;
+		margin: 0 auto 16px;
+		filter: drop-shadow(0 0 20px rgba(0, 255, 255, 0.5));
+	}
+
+	.login-box .icon img {
+		width: 100%;
+		height: 100%;
+	}
+
+	.particles {
+		position: fixed;
+		top: 0; left: 0;
+		width: 100%; height: 100%;
+		pointer-events: none;
+		z-index: 0;
+	}
+
+	.particle {
+		position: absolute;
+		width: 2px;
+		height: 2px;
+		background: #00ffff;
+		border-radius: 50%;
+		opacity: 0;
+		animation: float 8s infinite;
+	}
+
+	@keyframes float {
+		0% { opacity: 0; transform: translateY(100vh); }
+		10% { opacity: 0.6; }
+		90% { opacity: 0.6; }
+		100% { opacity: 0; transform: translateY(-10vh); }
+	}
+
+	.particle:nth-child(1) { left: 10%; animation-delay: 0s; animation-duration: 7s; }
+	.particle:nth-child(2) { left: 25%; animation-delay: 1s; animation-duration: 9s; }
+	.particle:nth-child(3) { left: 40%; animation-delay: 2s; animation-duration: 6s; }
+	.particle:nth-child(4) { left: 55%; animation-delay: 0.5s; animation-duration: 8s; }
+	.particle:nth-child(5) { left: 70%; animation-delay: 3s; animation-duration: 7s; }
+	.particle:nth-child(6) { left: 85%; animation-delay: 1.5s; animation-duration: 9s; }
+
+	@media (max-width: 768px) {
+		.login-left { display: none; }
+		.login-divider { display: none; }
+		.login-right { width: 100%; }
+	}
+</style>
+
+<div class="particles">
+	<div class="particle"></div>
+	<div class="particle"></div>
+	<div class="particle"></div>
+	<div class="particle"></div>
+	<div class="particle"></div>
+	<div class="particle"></div>
+</div>
+
+<div class="login-split">
+	<div class="login-left">
+		<img src="{{ media }}/background.webp" alt="">
+	</div>
+	<div class="login-divider"></div>
+	<div class="login-right">
+		<img class="login-right-bg" src="{{ media }}/background.webp" alt="">
+		<div class="login-box">
+			<div class="icon">
+				<img src="{{ media }}/miku-logo.svg" alt="Hatsune Miku">
+			</div>
+			<h1>CyberMiku</h1>
+			<div class="subtitle">Network Control System</div>
+			<div class="neon-line"></div>
+			<div class="miku-tag"><span class="leek">>>39</span> // HATSUNE_MIKU // v1.0</div>
+
+			{% if (fuser): %}
+			<div class="alert-message error">
+				{{ _('Invalid username and/or password! Please try again.') }}
+			</div>
+			{% endif %}
+
+		<form method="post">
+			<input type="hidden" name="redirect" value="admin/cybermiku">
+			<label for="luci_username">{{ _('Username') }}</label>
+			<input name="luci_username" id="luci_username" type="text" autocomplete="username" value="{{ entityencode(duser, true) }}">
+			<label for="luci_password">{{ _('Password') }}</label>
+			<input name="luci_password" id="luci_password" type="password" autocomplete="current-password">
+			<button type="submit" class="btn">{{ _('Log in') }}</button>
+		</form>
+
+			<div class="footer-text">Powered by OpenWRT // <span class="miku">&#9829; 39</span></div>
+		</div>
+	</div>
+</div>
+
+{% include('footer', { blank_page: true }) %}

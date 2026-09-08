@@ -1,0 +1,36 @@
+<%+header%>
+
+<div class="cyber-panel">
+	<h2><%:Reboot Device%></h2>
+	<p class="cyber-desc"><%:Restart the router. All active connections will be dropped.%></p>
+	<div class="cyber-actions">
+		<button class="cyber-btn cyber-btn-danger" onclick="rebootDevice()">
+			<%:REBOOT NOW%>
+		</button>
+	</div>
+	<div id="reboot-status" class="cyber-status" style="display:none;"></div>
+</div>
+
+<script>
+function rebootDevice() {
+	if (!confirm('<%:Are you sure you want to reboot the device?%>')) return;
+
+	var status = document.getElementById('reboot-status');
+	status.style.display = 'block';
+	status.textContent = '<%:Rebooting...%>';
+	status.className = 'cyber-status status-warning';
+
+	fetch('<%=luci.dispatcher.build_url("admin", "cybermiku", "api", "reboot")%>')
+		.then(() => {
+			status.textContent = '<%:Device is rebooting. This page will reload in 60 seconds...%>';
+			status.className = 'cyber-status status-info';
+			setTimeout(() => { location.reload(); }, 60000);
+		})
+		.catch(() => {
+			status.textContent = '<%:Reboot command sent. Device may be rebooting...%>';
+			status.className = 'cyber-status status-warning';
+		});
+}
+</script>
+
+<%+footer%>

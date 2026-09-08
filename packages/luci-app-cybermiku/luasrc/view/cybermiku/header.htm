@@ -1,0 +1,86 @@
+<%#
+	Custom header for CyberMiku - Login page
+%>
+<!DOCTYPE html>
+<html lang="<%=luci.i18n.context.lang%>">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>CyberMiku <%:Login%></title>
+	<link rel="stylesheet" href="<%=media%>/cybermiku/cascade.css">
+	<link rel="stylesheet" href="<%=media%>/cybermiku/cybermiku.css">
+	<link rel="stylesheet" href="<%=resource%>/css/cybermiku.css">
+	<link rel="icon" href="<%=media%>/cybermiku/miku-icon.svg" type="image/svg+xml">
+	<style>
+		body {
+			margin: 0; padding: 0;
+			background: #050508;
+			background-image: url('/background.jpg');
+			background-size: cover;
+			background-position: center;
+			background-repeat: no-repeat;
+			color: #e0e0e8;
+			font-family: 'Share Tech Mono', 'Courier New', monospace;
+			min-height: 100vh;
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+		}
+		#cybermiku-login {
+			text-align: center;
+			padding: 40px;
+			max-width: 400px;
+			width: 90%;
+		}
+		#cybermiku-login .logo-area {
+			margin-bottom: 30px;
+		}
+		#cybermiku-login .logo-area img {
+			width: 120px;
+			height: auto;
+			filter: drop-shadow(0 0 15px rgba(0,255,255,0.5));
+			margin-bottom: 15px;
+		}
+		#cybermiku-login h1 {
+			font-family: 'Orbitron', monospace;
+			color: #00ffff;
+			text-transform: uppercase;
+			letter-spacing: 6px;
+			font-size: 2rem;
+			margin: 0 0 5px 0;
+			text-shadow: 0 0 20px rgba(0,255,255,0.6), 0 0 40px rgba(0,255,255,0.2);
+		}
+		#cybermiku-login .subtitle {
+			color: #008b8b;
+			font-size: 0.75rem;
+			letter-spacing: 4px;
+			text-transform: uppercase;
+		}
+		#cybermiku-login .miku-tag {
+			margin-top: 15px;
+			color: #39c5bb;
+			font-size: 0.65rem;
+			letter-spacing: 2px;
+		}
+		#cybermiku-login .neon-line {
+			height: 1px;
+			background: linear-gradient(90deg, transparent, #00ffff, transparent);
+			box-shadow: 0 0 10px rgba(0,255,255,0.4);
+			margin: 20px 0;
+		}
+		#cybermiku-login .leek {
+			color: #00ff88;
+			text-shadow: 0 0 8px rgba(0,255,136,0.5);
+		}
+	</style>
+</head>
+<body>
+	<div id="cybermiku-login">
+		<div class="logo-area">
+			<img src="<%=media%>/cybermiku/miku-logo.svg" alt="Miku">
+			<h1>CyberMiku</h1>
+			<div class="subtitle">Network Control System</div>
+			<div class="neon-line"></div>
+			<div class="miku-tag"><span class="leek">>>39</span> // HATSUNE_MIKU // v1.0</div>
+		</div>

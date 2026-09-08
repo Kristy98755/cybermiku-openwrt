@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" fill="none">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <g filter="url(#glow)">
+    <!-- Leek icon -->
+    <path d="M10 48 Q12 30 15 15 Q16 10 18 15 Q20 30 22 48" stroke="#00ff88" stroke-width="2" fill="none"/>
+    <path d="M14 48 Q16 35 18 22 Q19 18 20 22 Q22 35 24 48" stroke="#00cc66" stroke-width="1.5" fill="none"/>
+    <!-- M text -->
+    <text x="35" y="42" font-family="'Courier New', monospace" font-size="32" font-weight="bold" fill="#00ffff" filter="url(#glow)">M</text>
+    <!-- 39 -->
+    <text x="62" y="42" font-family="'Courier New', monospace" font-size="24" fill="#008b8b">39</text>
+  </g>
+</svg>

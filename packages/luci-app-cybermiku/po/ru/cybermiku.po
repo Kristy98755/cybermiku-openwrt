@@ -1,0 +1,206 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: luci-app-cybermiku\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-01-01 00:00+0000\n"
+"PO-Revision-Date: 2026-01-01 00:00+0000\n"
+"Last-Translator: CyberMiku\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+
+msgid "CyberMiku"
+msgstr "CyberMiku"
+
+msgid "Admin"
+msgstr "Администрирование"
+
+msgid "Internet"
+msgstr "Интернет"
+
+msgid "System"
+msgstr "Система"
+
+msgid "WiFi Administration"
+msgstr "Настройка WiFi"
+
+msgid "Configure WiFi network name, password and connected clients."
+msgstr "Настройка имени сети, пароля и подключённых клиентов."
+
+msgid "Wireless Settings"
+msgstr "Настройки беспроводной сети"
+
+msgid "Channel"
+msgstr "Канал"
+
+msgid "Auto"
+msgstr "Авто"
+
+msgid "TX Power (dBm)"
+msgstr "Мощность передачи (дБм)"
+
+msgid "Interface Settings"
+msgstr "Настройки интерфейса"
+
+msgid "Network Name (SSID)"
+msgstr "Имя сети (SSID)"
+
+msgid "Encryption"
+msgstr "Шифрование"
+
+msgid "None"
+msgstr "Без шифрования"
+
+msgid "Password"
+msgstr "Пароль"
+
+msgid "Connected Clients"
+msgstr "Подключённые клиенты"
+
+msgid "Internet Settings"
+msgstr "Настройки интернета"
+
+msgid "Configure WAN connection mode and DNS settings."
+msgstr "Настройка режима подключения и DNS."
+
+msgid "WAN Interface"
+msgstr "Интерфейс WAN"
+
+msgid "Protocol"
+msgstr "Протокол"
+
+msgid "DHCP (Cable)"
+msgstr "DHCP (Кабель)"
+
+msgid "Static IP"
+msgstr "Статический IP"
+
+msgid "Disabled (Repeater)"
+msgstr "Выкл (Ретранслятор)"
+
+msgid "IP Address"
+msgstr "IP-адрес"
+
+msgid "Netmask"
+msgstr "Маска подсети"
+
+msgid "Gateway"
+msgstr "Шлюз"
+
+msgid "DNS Settings"
+msgstr "Настройки DNS"
+
+msgid "Primary DNS"
+msgstr "Основной DNS"
+
+msgid "Secondary DNS"
+msgstr "Запасной DNS"
+
+msgid "DNS Presets"
+msgstr "Пресеты DNS"
+
+msgid "LAN Bridge (Repeater Mode)"
+msgstr "Мост LAN (Режим ретранслятора)"
+
+msgid "Bridge LAN to WAN"
+msgstr "Соединить LAN с WAN"
+
+msgid "Enable to repeat WiFi to wired clients"
+msgstr "Включить для повторения WiFi на проводных клиентов"
+
+msgid "System Settings"
+msgstr "Настройки системы"
+
+msgid "Reboot device, update firmware, and view system information."
+msgstr "Перезагрузка, обновление прошивки и информация о системе."
+
+msgid "System Information"
+msgstr "Информация о системе"
+
+msgid "Hostname"
+msgstr "Имя хоста"
+
+msgid "Model"
+msgstr "Модель"
+
+msgid "Uptime"
+msgstr "Время работы"
+
+msgid "Kernel"
+msgstr "Ядро"
+
+msgid "Network Status"
+msgstr "Сетевой статус"
+
+msgid "WAN IP"
+msgstr "IP WAN"
+
+msgid "WAN Status"
+msgstr "Статус WAN"
+
+msgid "WiFi Status"
+msgstr "Статус WiFi"
+
+msgid "Clients"
+msgstr "Клиенты"
+
+msgid "Reboot Device"
+msgstr "Перезагрузка устройства"
+
+msgid "Restart the router. All active connections will be dropped."
+msgstr "Перезагрузка роутера. Все активные соединения будут разорваны."
+
+msgid "REBOOT NOW"
+msgstr "ПЕРЕЗАГРУЗИТЬ"
+
+msgid "Are you sure you want to reboot the device?"
+msgstr "Вы уверены, что хотите перезагрузить устройство?"
+
+msgid "Rebooting..."
+msgstr "Перезагрузка..."
+
+msgid "Device is rebooting. This page will reload in 60 seconds..."
+msgstr "Устройство перезагружается. Страница перезагрузится через 60 секунд..."
+
+msgid "Firmware Upgrade"
+msgstr "Обновление прошивки"
+
+msgid "Upload a sysupgrade firmware image to update the device."
+msgstr "Загрузите образ прошивки для обновления устройства."
+
+msgid "Select firmware file..."
+msgstr "Выберите файл прошивки..."
+
+msgid "UPLOAD & FLASH"
+msgstr "ЗАГРУЗИТЬ И ЗАПИСАТЬ"
+
+msgid "WARNING: Flashing wrong firmware may brick your device! Continue?"
+msgstr "ВНИМАНИЕ: Неправильная прошивка может повредить устройство! Продолжить?"
+
+msgid "Uploading firmware..."
+msgstr "Загрузка прошивки..."
+
+msgid "Firmware uploaded. Device will reboot..."
+msgstr "Прошивка загружена. Устройство перезагрузится..."
+
+msgid "Current Firmware"
+msgstr "Текущая прошивка"
+
+msgid "Version"
+msgstr "Версия"
+
+msgid "Target"
+msgstr "Цель"
+
+msgid "Change Root Password"
+msgstr "Смена пароля root"
+
+msgid "New Password"
+msgstr "Новый пароль"
+
+msgid "Confirm Password"
+msgstr "Подтвердите пароль"
+
+msgid "SAVE PASSWORD"
+msgstr "СОХРАНИТЬ ПАРОЛЬ"

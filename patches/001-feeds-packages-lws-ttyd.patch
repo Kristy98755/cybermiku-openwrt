@@ -1,0 +1,38 @@
+diff --git a/libs/libwebsockets/Makefile b/libs/libwebsockets/Makefile
+index 2fe7927..858c755 100644
+--- a/libs/libwebsockets/Makefile
++++ b/libs/libwebsockets/Makefile
+@@ -61,7 +61,7 @@ endef
+ define Package/libwebsockets-mbedtls
+ 	$(call Package/$(PKG_NAME)/Default)
+ 	TITLE += (mbedTLS)
+-	DEPENDS += +libmbedtls
++	DEPENDS += +libmbedtls +libuv
+ 	VARIANT:=mbedtls
+ 	PROVIDES:=libwebsockets
+ 	CONFLICTS:=libwebsockets-openssl
+@@ -82,6 +82,11 @@ endif
+ 
+ ifeq ($(BUILD_VARIANT),mbedtls)
+     CMAKE_OPTIONS += -DLWS_WITH_MBEDTLS=1
++    CMAKE_OPTIONS += -DLWS_WITH_LIBUV=ON
++    CMAKE_OPTIONS += -DLWS_WITH_PLUGINS=ON
++    CMAKE_OPTIONS += -DLWS_WITH_SERVER_STATUS=ON
++    CMAKE_OPTIONS += -DLWS_WITH_ACCESS_LOG=ON
++    CMAKE_OPTIONS += -DLWS_WITH_CGI=ON
+ endif
+ 
+ ifeq ($(BUILD_VARIANT),full)
+diff --git a/utils/ttyd/Makefile b/utils/ttyd/Makefile
+index ae03f26..18ed149 100644
+--- a/utils/ttyd/Makefile
++++ b/utils/ttyd/Makefile
+@@ -27,7 +27,7 @@ define Package/ttyd
+ 	SECTION:=utils
+ 	CATEGORY:=Utilities
+ 	TITLE:=Command-line tool for sharing terminal over the web
+-	DEPENDS:=+libcap +libopenssl +libjson-c +libuv +zlib +libwebsockets-full
++	DEPENDS:=+libcap +libjson-c +libuv +zlib +libwebsockets-mbedtls
+ 	URL:=https://github.com/tsl0922/ttyd
+ 	SUBMENU:=Terminal
+ endef

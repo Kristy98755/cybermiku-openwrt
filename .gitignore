@@ -1,0 +1,13 @@
+# build scratch
+/work/
+build_dir/
+staging_dir/
+tmp/
+dl/
+bin/
+feeds/luci/
+feeds/packages/
+feeds/routing/
+feeds/telephony/
+*.ipk
+*.patch.*

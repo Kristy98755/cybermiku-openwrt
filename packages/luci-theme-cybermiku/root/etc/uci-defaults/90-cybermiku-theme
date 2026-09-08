@@ -1,0 +1,13 @@
+#!/bin/sh
+
+uci set luci.main.mediatheme='cybermiku'
+uci set luci.main.mediaurlbase='/luci-static/cybermiku'
+
+uci -q batch <<-EOT
+	delete luci.themes.CyberMiku
+	set luci.themes.CyberMiku='/luci-static/cybermiku'
+EOT
+
+uci commit luci
+
+echo "CyberMiku theme activated."

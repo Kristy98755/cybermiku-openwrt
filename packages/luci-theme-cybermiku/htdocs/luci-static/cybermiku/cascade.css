@@ -1,0 +1,660 @@
+/* CyberMiku Theme for LuCI 24.10 */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+:root {
+	--cyan: #00ffff;
+	--cyan-dim: #008b8b;
+	--cyan-glow: rgba(0, 255, 255, 0.5);
+	--cyan-deep: rgba(0, 255, 255, 0.15);
+	--miku-teal: #39c5bb;
+	--miku-pink: #e94196;
+	--bg: #050508;
+	--bg-card: rgba(10, 10, 15, 0.85);
+	--bg-input: #0a0a10;
+	--text: #e0e0e8;
+	--text-dim: #6a6a7a;
+	--border: rgba(0, 255, 255, 0.2);
+	--danger: #ff4060;
+	--warning: #ffaa00;
+	--success: #00ff88;
+	--font-display: 'Orbitron', 'Courier New', monospace;
+	--font-mono: 'Share Tech Mono', 'Courier New', monospace;
+}
+
+* { box-sizing: border-box; }
+
+/* === BODY === */
+body, body.luci {
+	background: var(--bg);
+	background-image:
+		radial-gradient(ellipse at 20% 50%, rgba(0, 255, 255, 0.03) 0%, transparent 50%),
+		radial-gradient(ellipse at 80% 20%, rgba(233, 65, 150, 0.02) 0%, transparent 50%),
+		radial-gradient(ellipse at 50% 80%, rgba(57, 197, 187, 0.02) 0%, transparent 50%);
+	color: var(--text);
+	font-family: var(--font-mono);
+	background-attachment: fixed;
+}
+
+body::before {
+	content: '';
+	position: fixed;
+	top: 0; left: 0;
+	width: 100%; height: 100%;
+	background-image:
+		linear-gradient(rgba(0, 255, 255, 0.015) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(0, 255, 255, 0.015) 1px, transparent 1px);
+	background-size: 50px 50px;
+	pointer-events: none;
+	z-index: -1;
+}
+
+/* === HEADER === */
+header {
+	background: rgba(5, 5, 8, 0.95) !important;
+	border-bottom: 2px solid var(--cyan) !important;
+	box-shadow: 0 0 30px rgba(0, 255, 255, 0.15), 0 0 60px rgba(0, 255, 255, 0.05);
+	position: sticky;
+	top: 0;
+	z-index: 100;
+}
+
+header .brand {
+	font-family: var(--font-display);
+	color: var(--cyan);
+	font-size: 1rem;
+	letter-spacing: 4px;
+	text-shadow: 0 0 15px var(--cyan-glow);
+	text-decoration: none;
+	text-transform: uppercase;
+}
+
+/* === NAVIGATION === */
+.nav > li > a, .nav > li > .dropdown-toggle {
+	color: var(--text-dim);
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+	text-transform: uppercase;
+	letter-spacing: 2px;
+	transition: all 0.3s;
+	padding: 12px 16px;
+}
+
+.nav > li > a:hover, .nav > li > a:focus,
+.nav > .active > a, .nav > .active > a:hover {
+	color: var(--cyan);
+	text-shadow: 0 0 10px var(--cyan-glow), 0 0 20px var(--cyan-glow);
+	background: transparent;
+}
+
+.navbar, .dropdown-menu {
+	background: rgba(5, 5, 8, 0.95) !important;
+	border: 1px solid var(--border);
+}
+
+.dropdown-menu > li > a {
+	color: var(--text);
+	font-family: var(--font-mono);
+	text-transform: none;
+	letter-spacing: 0;
+}
+
+.dropdown-menu > li > a:hover {
+	background: rgba(0, 255, 255, 0.06);
+	color: var(--cyan);
+}
+
+/* === HEADINGS === */
+h1, h2, h3, h4, h5, h6 {
+	color: var(--cyan) !important;
+	font-family: var(--font-display);
+	text-transform: uppercase;
+	letter-spacing: 3px;
+	text-shadow: 0 0 10px var(--cyan-glow), 0 0 30px rgba(0, 255, 255, 0.2);
+}
+
+h1 { font-size: 1.3rem; }
+h2 { font-size: 1.1rem; }
+h3 { font-size: 0.9rem; }
+
+h2::after, h3::after {
+	content: '';
+	display: block;
+	height: 1px;
+	background: linear-gradient(90deg, var(--cyan), transparent);
+	margin-top: 8px;
+	box-shadow: 0 0 8px var(--cyan-glow);
+}
+
+/* === BUTTONS === */
+.btn, .cbi-button, button, [type="submit"], [type="button"] {
+	background: rgba(0, 255, 255, 0.05) !important;
+	border: 1px solid var(--cyan) !important;
+	color: var(--cyan) !important;
+	font-family: var(--font-display);
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 2px;
+	padding: 10px 24px;
+	border-radius: 0;
+	transition: all 0.3s;
+	box-shadow: 0 0 10px rgba(0, 255, 255, 0.1), inset 0 0 10px rgba(0, 255, 255, 0.05);
+}
+
+.btn:hover, .cbi-button:hover, button:hover {
+	background: var(--cyan) !important;
+	color: var(--bg) !important;
+	box-shadow: 0 0 20px var(--cyan-glow), 0 0 40px rgba(0, 255, 255, 0.2);
+	text-shadow: none;
+}
+
+.cbi-button-positive, .cbi-button-save, .cbi-button-apply, .btn-primary {
+	background: rgba(0, 255, 255, 0.08) !important;
+	border-color: var(--cyan) !important;
+	color: var(--cyan) !important;
+	box-shadow: 0 0 15px rgba(0, 255, 255, 0.1), inset 0 0 15px rgba(0, 255, 255, 0.05);
+}
+
+.cbi-button-positive:hover, .cbi-button-save:hover, .cbi-button-apply:hover, .btn-primary:hover {
+	background: var(--cyan) !important;
+	color: var(--bg) !important;
+	box-shadow: 0 0 25px var(--cyan-glow), 0 0 50px rgba(0, 255, 255, 0.3);
+}
+
+.cbi-button-negative, .btn-danger, .cbi-button-reset {
+	border-color: var(--danger) !important;
+	color: var(--danger) !important;
+	box-shadow: 0 0 10px rgba(255, 64, 96, 0.1);
+}
+
+.cbi-button-negative:hover, .btn-danger:hover {
+	background: var(--danger) !important;
+	color: var(--bg) !important;
+	box-shadow: 0 0 20px rgba(255, 64, 96, 0.4);
+}
+
+/* === INPUTS === */
+input[type="text"], input[type="password"], input[type="number"],
+input[type="email"], textarea, select, .cbi-input-select, .cbi-input-text {
+	background: var(--bg-input) !important;
+	border: 1px solid var(--border) !important;
+	color: var(--cyan);
+	font-family: var(--font-mono);
+	padding: 10px 14px;
+	border-radius: 0;
+	outline: none;
+	transition: all 0.3s;
+	box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+input:focus, select:focus, textarea:focus {
+	border-color: var(--cyan) !important;
+	box-shadow: 0 0 15px var(--cyan-glow), inset 0 0 10px rgba(0, 255, 255, 0.05) !important;
+}
+
+select.cbi-input-select {
+	width: auto !important;
+	max-width: 100% !important;
+	height: auto !important;
+	padding: 6px 12px !important;
+}
+
+select option {
+	background: var(--bg-input) !important;
+	color: var(--text) !important;
+}
+
+/* === PANELS / SECTIONS === */
+.cbi-section, .panel, .well, .card {
+	background: var(--bg-card);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	box-shadow: 0 0 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(0, 255, 255, 0.03);
+}
+
+.cbi-section-descr {
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 10px;
+	color: var(--text-dim);
+}
+
+.cbi-page-actions, .actions {
+	background: rgba(5, 5, 8, 0.65) !important;
+	border-top: 1px solid var(--border) !important;
+	border-radius: 0 0 4px 4px !important;
+	text-align: right;
+	padding: 16px 20px !important;
+	margin-bottom: 18px !important;
+}
+
+/* === TABLES === */
+table, .cbi-section-table {
+	border-collapse: collapse;
+	background: transparent;
+	width: 100%;
+}
+
+th, td, .cbi-section-table-cell {
+	border: 1px solid rgba(0, 255, 255, 0.08);
+	padding: 10px 14px;
+}
+
+th, .cbi-section-table-head {
+	background: rgba(0, 255, 255, 0.04);
+	color: var(--cyan);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+}
+
+td { color: var(--text); }
+
+tr:hover td {
+	background: rgba(0, 255, 255, 0.03);
+}
+
+.cbi-section-table-row:nth-child(even) {
+	border-left: 2px solid rgba(57, 197, 187, 0.3);
+}
+
+/* === STATUS PAGE === */
+table tr td:first-child {
+	color: var(--text-dim);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+}
+
+.status-up {
+	color: var(--success);
+	text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
+}
+
+.status-down {
+	color: var(--danger);
+	text-shadow: 0 0 8px rgba(255, 64, 96, 0.5);
+}
+
+/* === TABS === */
+.tabMenu, .cbi-tab-menu, .nav-tabs {
+	border-bottom: 2px solid var(--border);
+	background: transparent;
+}
+
+.tabMenu li a, .cbi-tab-menu li a, .nav-tabs > li > a {
+	color: var(--text-dim);
+	text-transform: uppercase;
+	letter-spacing: 1.5px;
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+	padding: 12px 20px;
+	transition: all 0.3s;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -2px;
+	background: transparent;
+}
+
+.tabMenu li a:hover, .cbi-tab-menu li a:hover,
+.nav-tabs > li > a:hover {
+	color: var(--cyan);
+	text-shadow: 0 0 10px var(--cyan-glow);
+	background: transparent;
+}
+
+.tabMenu li.active a, .cbi-tab-menu li.selected a,
+.nav-tabs > li.active > a {
+	color: var(--cyan);
+	border-bottom: 2px solid var(--cyan);
+	text-shadow: 0 0 10px var(--cyan-glow);
+	background: transparent;
+}
+
+/* === TABS (LuCI 24.10 cbi-tabmenu) === */
+.tabs, .cbi-tabmenu {
+	background: transparent !important;
+	border-bottom: 2px solid var(--border) !important;
+	margin: 0 0 18px !important;
+	padding: 0 !important;
+	flex-wrap: wrap;
+}
+
+.tabs > li, .cbi-tabmenu > li {
+	background: transparent !important;
+	border: none !important;
+	border-radius: 0 !important;
+	margin: 0 !important;
+	max-width: none !important;
+	height: auto !important;
+	flex: 0 1 auto !important;
+	color: var(--text-dim) !important;
+}
+
+.tabs > li > a, .cbi-tabmenu > li > a {
+	white-space: nowrap !important;
+	text-overflow: ellipsis !important;
+	color: var(--text-dim) !important;
+	text-transform: uppercase !important;
+	letter-spacing: 1.5px !important;
+	font-family: var(--font-display) !important;
+	font-size: 0.7rem !important;
+	padding: 12px 20px !important;
+	border-bottom: 2px solid transparent !important;
+	margin-bottom: -2px !important;
+	line-height: normal !important;
+	border-radius: 0 !important;
+	background: transparent !important;
+	text-shadow: none !important;
+}
+
+.tabs > li > a:hover, .cbi-tabmenu > li > a:hover {
+	color: var(--cyan) !important;
+	text-shadow: 0 0 10px var(--cyan-glow) !important;
+	background: transparent !important;
+	text-decoration: none !important;
+}
+
+.tabs > li.active > a, .cbi-tabmenu > li.cbi-tab > a {
+	color: var(--cyan) !important;
+	border-bottom-color: var(--cyan) !important;
+	text-shadow: 0 0 10px var(--cyan-glow) !important;
+}
+
+/* === ALERTS === */
+.alert {
+	border-radius: 0;
+	border: 1px solid;
+}
+
+.alert-message.warning {
+	background: rgba(255, 170, 0, 0.08);
+	border-color: var(--warning);
+	color: var(--warning);
+}
+
+.alert-message.error, .alert-danger {
+	background: rgba(255, 64, 96, 0.08);
+	border-color: var(--danger);
+	color: var(--danger);
+}
+
+.alert-message.info, .alert-info {
+	background: rgba(0, 255, 255, 0.05);
+	border-color: var(--cyan);
+	color: var(--cyan);
+}
+
+/* === LABELS === */
+label, .control-label, .cbi-value-title {
+	color: var(--cyan-dim);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	font-family: var(--font-display);
+	font-size: 0.7rem;
+}
+
+/* === PROGRESS BAR === */
+.progress {
+	background: var(--bg-input);
+	border-radius: 0;
+	box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+	overflow: hidden;
+}
+
+.progress-bar {
+	background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+	box-shadow: 0 0 10px var(--cyan-glow);
+}
+
+.cbi-progressbar {
+	background: #000 !important;
+	border: 1px solid var(--cyan) !important;
+	border-radius: 0 !important;
+	box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.6), 0 0 8px rgba(0, 255, 255, 0.15) !important;
+}
+
+.cbi-progressbar > div {
+	background: linear-gradient(90deg, var(--cyan-dim), var(--cyan)) !important;
+	box-shadow: 0 0 10px var(--cyan-glow) !important;
+}
+
+.cbi-progressbar::before {
+	color: var(--cyan) !important;
+	text-shadow: 0 0 6px var(--cyan-glow) !important;
+}
+
+/* === SPINNER === */
+.spinning {
+	color: var(--cyan) !important;
+}
+
+.spinning::before {
+	background: var(--cyan) !important;
+	box-shadow: 0 0 12px var(--cyan-glow) !important;
+}
+
+/* === MODAL === */
+.modal, .modal-content, #modal_overlay > .modal {
+	background: var(--bg-card) !important;
+	border: 1px solid var(--cyan) !important;
+	box-shadow: 0 0 30px var(--cyan-glow), 0 0 60px rgba(0, 255, 255, 0.1) !important;
+	border-radius: 4px !important;
+	color: var(--text) !important;
+}
+
+.modal > p, .modal > ul > li, .modal > pre, .modal > textarea {
+	color: var(--text) !important;
+}
+
+.modal label {
+	text-transform: none !important;
+	letter-spacing: 0 !important;
+	color: var(--text) !important;
+	font-family: var(--font-mono) !important;
+}
+
+.modal label.btn {
+	display: flex !important;
+	align-items: baseline;
+	gap: 0.5em;
+	white-space: normal !important;
+	text-align: left !important;
+	line-height: 1.6 !important;
+	word-break: break-word !important;
+	padding: 8px 12px !important;
+}
+
+.modal label.btn > input[type="checkbox"] {
+	flex: 0 0 auto;
+}
+
+.modal label input[type="checkbox"], .modal label input[type="radio"],
+.cbi-value-field .cbi-checkbox input[type="checkbox"],
+.cbi-value-field .cbi-radio input[type="radio"] {
+	appearance: none !important;
+	-webkit-appearance: none !important;
+	width: 16px !important;
+	height: 16px !important;
+	border: 1px solid var(--cyan) !important;
+	border-radius: 2px !important;
+	background-color: #000 !important;
+	background-image: none !important;
+	box-shadow: inset 0 0 6px rgba(0,255,255,0.08) !important;
+	cursor: pointer !important;
+	position: relative !important;
+	flex: 0 0 auto !important;
+	transition: all 0.3s !important;
+}
+.modal label input[type="checkbox"]::before, .modal label input[type="checkbox"]::after,
+.modal label input[type="radio"]::before, .modal label input[type="radio"]::after,
+.cbi-value-field .cbi-checkbox input[type="checkbox"]::before,
+.cbi-value-field .cbi-checkbox input[type="checkbox"]::after,
+.cbi-value-field .cbi-radio input[type="radio"]::before,
+.cbi-value-field .cbi-radio input[type="radio"]::after {
+	content: none !important;
+	width: auto !important;
+	height: auto !important;
+	background: none !important;
+	border: none !important;
+	mask: none !important;
+	-webkit-mask: none !important;
+}
+.modal label input[type="radio"], .cbi-value-field .cbi-radio input[type="radio"] {
+	border-radius: 50% !important;
+}
+.modal label input[type="checkbox"]:hover,
+.cbi-value-field .cbi-checkbox input[type="checkbox"]:hover {
+	box-shadow: 0 0 10px rgba(0,255,255,0.3), inset 0 0 6px rgba(0,255,255,0.08) !important;
+}
+.modal label input[type="checkbox"]:checked,
+.cbi-value-field .cbi-checkbox input[type="checkbox"]:checked {
+	background-color: #000 !important;
+	border-color: var(--cyan) !important;
+	box-shadow: 0 0 10px rgba(0,255,255,0.45) !important;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2300ffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 8l3.2 3.2L13 4'/%3E%3C/svg%3E") !important;
+	background-repeat: no-repeat !important;
+	background-position: center !important;
+	background-size: 12px 12px !important;
+}
+.modal label input[type="checkbox"]:disabled,
+.cbi-value-field .cbi-checkbox input[type="checkbox"]:disabled {
+	opacity: 0.4 !important;
+	border-color: rgba(0,255,255,0.35) !important;
+	box-shadow: none !important;
+	cursor: not-allowed !important;
+}
+.modal label input[type="radio"]:checked,
+.cbi-value-field .cbi-radio input[type="radio"]:checked {
+	background-color: #000 !important;
+	border-color: var(--cyan) !important;
+	background-image: radial-gradient(circle, var(--cyan) 40%, transparent 42%) !important;
+	background-size: 8px 8px !important;
+	box-shadow: 0 0 10px rgba(0,255,255,0.45) !important;
+}
+
+.modal-header {
+	background: rgba(0, 255, 255, 0.06);
+	border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+	color: var(--cyan);
+	text-transform: uppercase;
+	letter-spacing: 2px;
+	font-family: var(--font-display);
+}
+
+/* === CODE === */
+code, pre {
+	background: rgba(0, 0, 0, 0.5);
+	border: 1px solid var(--border);
+	color: var(--cyan);
+}
+
+/* === LINKS === */
+a {
+	color: var(--cyan);
+	text-decoration: none;
+	transition: all 0.3s;
+}
+
+a:hover {
+	text-shadow: 0 0 10px var(--cyan-glow), 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+/* === FOOTER === */
+footer {
+	background: rgba(5, 5, 8, 0.95) !important;
+	border-top: 1px solid var(--border);
+	color: var(--text-dim);
+	font-size: 0.7rem;
+	letter-spacing: 1px;
+}
+
+footer a {
+	color: var(--miku-teal);
+}
+
+/* === CHECKBOX / RADIO === */
+input[type="checkbox"], input[type="radio"] {
+	accent-color: var(--cyan);
+}
+
+/* === SCROLLBAR === */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #050508; }
+::-webkit-scrollbar-thumb { background: var(--cyan-dim); box-shadow: 0 0 6px var(--cyan-glow); }
+::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
+
+/* === DECORATIONS === */
+.cbi-value-title::after {
+	content: ' //39';
+	color: rgba(0, 255, 255, 0.15);
+	font-family: var(--font-display);
+	font-size: 0.6rem;
+}
+
+/* === NEON LINE === */
+.neon-line {
+	height: 1px;
+	background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+	box-shadow: 0 0 10px var(--cyan-glow);
+	margin: 15px 0;
+}
+
+/* === ANIMATIONS === */
+@keyframes neonPulse {
+	0%, 100% { box-shadow: 0 0 5px var(--cyan-glow); }
+	50% { box-shadow: 0 0 20px var(--cyan-glow), 0 0 40px rgba(0, 255, 255, 0.1); }
+}
+
+@keyframes cyanFlicker {
+	0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+	20%, 24%, 55% { opacity: 0.6; }
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+	h1 { font-size: 0.9rem; letter-spacing: 1px; }
+	.btn, .cbi-button { padding: 8px 16px; font-size: 0.65rem; }
+	.container, #main { padding: 10px; }
+}
+
+/* === LIST GROUP === */
+.list-group-item {
+	background: rgba(10, 10, 15, 0.6);
+	border: 1px solid var(--border);
+	color: var(--text);
+}
+
+.list-group-item:hover {
+	background: rgba(0, 255, 255, 0.03);
+}
+
+/* === BADGE === */
+.badge {
+	background: var(--cyan);
+	color: var(--bg);
+	font-family: var(--font-display);
+}
+
+/* === PAGINATION === */
+.pagination > li > a {
+	color: var(--cyan);
+	border: 1px solid var(--border);
+}
+
+.pagination > .active > a {
+	background: var(--cyan);
+	border-color: var(--cyan);
+	color: var(--bg);
+	box-shadow: 0 0 15px var(--cyan-glow);
+}
+
+/* === TOOLTIP === */
+.tooltip-inner {
+	background: var(--bg-card);
+	border: 1px solid var(--cyan);
+	color: var(--cyan);
+}
