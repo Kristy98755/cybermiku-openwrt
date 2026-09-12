@@ -8,10 +8,22 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>{{ boardinfo.hostname || 'CyberMiku' }} - Network Control System</title>
 	<link rel="icon" href="/luci-static/cybermiku/favicon.ico" type="image/x-icon">
-	<link rel="preconnect" href="https://fonts.googleapis.com">
-	<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 	<script>window.CMK_SID='{{ ctx.authsession }}';</script>
 	<style>
+		@font-face {
+			font-family: 'Orbitron';
+			font-style: normal;
+			font-weight: 100 900;
+			font-display: swap;
+			src: url('/luci-static/cybermiku/fonts/Orbitron.woff2') format('woff2');
+		}
+		@font-face {
+			font-family: 'Share Tech Mono';
+			font-style: normal;
+			font-weight: 400;
+			font-display: swap;
+			src: url('/luci-static/cybermiku/fonts/ShareTechMono.woff2') format('woff2');
+		}
 		:root {
 			--bg: #050508;
 			--bg-card: rgba(10, 12, 18, 0.9);
@@ -647,6 +659,6 @@
 	<div id="app">
 		<div class="cmk-loading">INITIALIZING</div>
 	</div>
-	<script src="/luci-static/cybermiku/app.js"></script>
+	<script src="/luci-static/cybermiku/app.js?v=20260908j"></script>
 </body>
 </html>

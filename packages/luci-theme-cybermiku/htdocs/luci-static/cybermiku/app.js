@@ -110,7 +110,7 @@ var CMK = {
 			'      <li data-tab="system"><a href="#system-info">SYSTEM</a>',
 			'        <div class="cmk-dropdown" data-submenu="system">',
 			'          <a href="#system-info">INFO</a>',
-			'          <a href="#system-password">PASSWORD</a>',
+			'          <a href="/cgi-bin/luci/admin/system/admin" data-stock="1">PASSWORD</a>',
 			'          <a href="#system-leds">LEDS</a>',
 			'          <a href="#system-cron">CRON</a>',
 			'          <a href="#system-backup">FLASH</a>',
@@ -220,6 +220,7 @@ var CMK = {
 		c.innerHTML = '<div class="cmk-loading">LOADING</div>';
 		var self = this;
 		clearInterval(self._pollTimer);
+		clearTimeout(self._repTimer);
 		switch (tab) {
 			case 'status': self.renderStatus(c, sub); break;
 			case 'network': self.renderNetwork(c, sub); break;
@@ -987,17 +988,133 @@ var CMK = {
 			'<div class="cmk-panel"><div class="cmk-panel-title">DNS OVERRIDE</div>' +
 			'<div id="repeater-dns"></div></div>';
 
+		var POLL_MS = 3000;
+		var POLL_CONNECTED_MS = 15000;
+		var ASSOC_GRACE_MS = 30000;
+		var AUTH_WINDOW_MS = 300000;
+		var NOTFOUND_SCAN_MS = 20000;
+		var LOCAL_DOWN_GRACE_MS = 20000;
+		var repState = {
+			cfgSince: Date.now(), assocSince: 0, upDownAt: Date.now(), dropAt: 0,
+			localDownAt: 0,
+			authAt: 0, logAt: 0, scanAt: 0, scanning: false,
+			lastUp: null, lastState: '', ssidMissing: false,
+			cfgP: false, staSSID: '', staIfname: '', wwanIp: '', remoteNote: '',
+			cfgBuf: null, pollSeq: (self.repState && self.repState.pollSeq) || 0
+		};
+		self.repState = repState;
+		var pws = {};
+		var pwsLoad = function() {
+			return self.rpc('file', 'exec', { command: '/bin/cat', params: ['/etc/cybermiku.json'] }).then(function(res) {
+				var s = (res && res.stdout) ? res.stdout : (typeof res === 'string' ? res : '');
+				var o = null;
+				try { o = JSON.parse(s); } catch (e) { o = null; }
+				if (o && typeof o === 'object' && !Array.isArray(o)) {
+					for (var k in o) if (o[k] != null) pws[k] = o[k];
+				}
+				return pws;
+			}).catch(function() { return pws; });
+		};
+		var pwsSave = function() {
+			try {
+				var body = JSON.stringify(pws);
+				var sh = "umask 077; cat > /etc/cybermiku.json <<'CMKEOF'\n" + body + "\nCMKEOF\n";
+				return self.rpc('file', 'exec', { command: '/bin/sh', params: ['-c', sh] }).catch(function() { return null; });
+			} catch (e) { return null; }
+		};
+		var st = null;
+		var readWifiTail = function() {
+			return self._pTimeout(self.rpc('file', 'exec', { command: '/sbin/logread', params: [] }), 8000).then(function(res) {
+				var s = (res && res.stdout) ? res.stdout : (typeof res === 'string' ? res : '');
+				var lines = s.split('\n').filter(function(l) {
+					return /wpa|eapol|auth|assoc|hostapd|netifd|wwan|wireless|udhcpc|dhcp/i.test(l);
+				});
+				return lines.slice(-60).join('\n');
+			}).catch(function() { return ''; });
+		};
+		var detectAuthFail = function() {
+			var now = Date.now();
+			if (now - repState.logAt < 4000) return Promise.resolve(now - repState.authAt < AUTH_WINDOW_MS);
+			repState.logAt = now;
+			return readWifiTail().then(function(tail) {
+				var okRe = /CTRL-EVENT-CONNECTED|Key negotiation completed/gi;
+				var failRe = /4-Way Handshake failed|4-way handshake failed|WRONG_KEY|WRONG_PASSWORD|AUTH_FAILED|AUTHENTICATION_FAILED|wrong password|pre-shared key may be incorrect|key may be incorrect|password.*incorrect|incorrect.*password|MIC failure|MIC mismatch|EAPOL.*fail|SSID-TEMP-DISABLED|TEMP-DISABLED|auth_failures/gi;
+				var lastOk = -1, lastFail = -1, m;
+				while ((m = okRe.exec(tail)) !== null) lastOk = okRe.lastIndex;
+				while ((m = failRe.exec(tail)) !== null) lastFail = failRe.lastIndex;
+				// the most recent handshake outcome decides: success clears, failure marks authAt
+				if (lastOk > lastFail) repState.authAt = 0;
+				else if (lastFail >= 0) repState.authAt = now;
+				return (now - repState.authAt < AUTH_WINDOW_MS);
+			}).catch(function() { return (now - repState.authAt < AUTH_WINDOW_MS); });
+		};
+		var scanMiss = function(ssid) {
+			var now = Date.now();
+			if (now - repState.scanAt < NOTFOUND_SCAN_MS) return Promise.resolve(repState.ssidMissing);
+			if (repState.scanning) return Promise.resolve(repState.ssidMissing);
+			repState.scanning = true;
+			return self._pTimeout(self.rpc('iwinfo', 'scan', { device: 'phy0' }), 10000).then(function(data) {
+				repState.scanAt = now;
+				var results = (data && data.results) ? data.results : (Array.isArray(data) ? data : []);
+				var found = false;
+				for (var i = 0; i < results.length; i++) {
+					if (String(results[i].ssid || '') === ssid) { found = true; break; }
+					if (String(results[i].ssid || '') === '' && results[i].encryption && results[i].encryption.enabled) { found = true; }
+				}
+				repState.ssidMissing = !found;
+				return !found;
+			}).catch(function() { repState.scanAt = now; return false; }).then(function(miss) {
+				repState.scanning = false;
+				return miss;
+			});
+		};
+		var paint = function(state, cls) {
+			if (!st) return;
+			var grid = st.querySelector('.cmk-grid');
+			if (!grid) {
+				var repH = '';
+				repH += '<div class="cmk-grid">';
+				repH += self.statCard('STATUS', state, cls);
+				repH += self.statCard('REMOTE SSID', repState.cfgP ? self.esc(repState.staSSID) : 'None');
+				repH += self.statCard('REMOTE IFACE', repState.cfgP ? self.esc(repState.staIfname || '-') : '-');
+				repH += self.statCard('REMOTE IP', repState.wwanIp || '-');
+				repH += '</div>';
+				repH += '<p class="cmk-rep-note" style="color:var(--text-dim);margin-top:15px;font-size:0.8rem">' +
+					self.esc(self.repNote(state)) + '</p>';
+				repH += '<div style="margin-top:15px"><button class="cmk-btn" id="repeater-disconnect" style="border-color:var(--danger);color:var(--danger)"' + (state === 'DISCONNECTED' ? ' disabled' : '') + '>DISCONNECT &amp; STOP REPEATER</button></div>';
+				st.innerHTML = repH;
+				var disco = document.getElementById('repeater-disconnect');
+				if (disco) { disco.onclick = function() { self.repeaterDisconnect(); }; disco.disabled = (state === 'DISCONNECTED'); }
+				return;
+			}
+			var vals = grid.querySelectorAll('.cmk-stat-value');
+			if (vals[0]) { vals[0].textContent = state; vals[0].className = 'cmk-stat-value ' + cls; }
+			if (vals[1]) vals[1].textContent = repState.cfgP ? String(repState.staSSID) : 'None';
+			if (vals[2]) vals[2].textContent = repState.cfgP ? String(repState.staIfname || '-') : '-';
+			if (vals[3]) vals[3].textContent = repState.wwanIp || '-';
+			var note = st.querySelector('.cmk-rep-note');
+			if (note) note.textContent = this.repNote(state);
+			var disco = st.querySelector('#repeater-disconnect');
+			if (disco) disco.disabled = (state === 'DISCONNECTED');
+			if (state !== 'CONNECTING') {
+				var cmsg = document.getElementById('rep-connect-msg');
+				if (cmsg && cmsg.firstChild && cmsg.firstChild.className === 'cmk-loading') cmsg.innerHTML = '';
+			}
+		};
 		var loadStatus = function() {
-			var st = document.getElementById('repeater-status');
-			Promise.all([
+			st = st || document.getElementById('repeater-status');
+			if (!st) return;
+			repState.pollSeq = (repState.pollSeq || 0) + 1;
+			var seq = repState.pollSeq;
+			return self._pTimeout(Promise.all([
 				self.rpc('network.wireless', 'status', {}).catch(function() { return {}; }),
 				self.uci('wireless', 'get').catch(function() { return {}; }),
 				self.uci('network', 'get').catch(function() { return {}; }),
 				self.rpc('network.interface', 'dump', {}).catch(function() { return []; })
-			]).then(function(r) {
-				if (!st) return;
-				var ws = r[0] || {}, ncfg = r[2] || {};
-				var staIface = null, staSSID = '', staIfname = '';
+			]), 10000).then(function(r) {
+				var ws = r[0] || {}, wcfg = r[1] || {};
+				repState.remoteNote = '';
+				var staIface = null, staSSID = '', staIfname = '', staDisabled = false, radioUp = true;
 				for (var rn in ws) {
 					var radio = ws[rn];
 					if (!radio || !radio.interfaces) continue;
@@ -1008,52 +1125,329 @@ var CMK = {
 							staIface = itf;
 							staSSID = cfg.ssid || itf.ssid || '?';
 							staIfname = itf.ifname || '';
+							radioUp = (radio.up === false) ? false : true;
+							staDisabled = cfg.disabled === '1' || itf.disabled === true;
 						}
 					}
 				}
-				var liveCheck = Promise.resolve(false);
+				var cfgP = false;
+				for (var sec in wcfg) {
+					if (wcfg[sec] && wcfg[sec].mode === 'sta') { cfgP = true; break; }
+				}
+				// pre-populate pws from UCI so the web UI knows passwords for configured networks
+				for (var sec2 in wcfg) {
+					if (wcfg[sec2] && wcfg[sec2].mode === 'sta' && wcfg[sec2].ssid && wcfg[sec2].key) {
+						if (pws[wcfg[sec2].ssid] !== wcfg[sec2].key) {
+							pws[wcfg[sec2].ssid] = wcfg[sec2].key;
+							try { pwsSave(); } catch (e) { }
+						}
+					}
+				}
+				var cfgBuf = repState.cfgBuf;
+				if (cfgBuf && (Date.now() - cfgBuf.at > 120000)) { repState.cfgBuf = null; cfgBuf = null; }
+				if (cfgBuf && !cfgP && (Date.now() - cfgBuf.at > 30000)) { repState.cfgBuf = null; cfgBuf = null; }
+				if (cfgBuf) cfgP = true;
+				repState.cfgP = cfgP;
+				repState.staSSID = cfgBuf ? cfgBuf.ssid : (staSSID || '?');
+				repState.staIfname = staIfname || '';
+				var livePromise = Promise.resolve({ assoc: false });
 				if (staIface && staIfname) {
-					liveCheck = self.rpc('iwinfo', 'info', { device: staIfname }).then(function(inf) {
+					livePromise = self._pTimeout(self.rpc('iwinfo', 'info', { device: staIfname }), 10000).then(function(inf) {
 						var row = (inf && typeof inf === 'object') ? inf : null;
-						if (!row) return false;
-						var ap = String(row.accesspoint || '');
-						if (!/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(ap) || ap === '00:00:00:00:00:00') return false;
+						if (!row) return { assoc: false };
+						var ap = String(row.bssid || row.accesspoint || '');
+						if (!/^[0-9a-f]{2}(:[0-9a-f]{2}){5}$/i.test(ap) || ap === '00:00:00:00:00:00') return { assoc: false };
 						var ssid = String(row.ssid || row.essid || '');
 						var sig = row.signal == null ? '' : String(row.signal);
-						if (/unknown|none|n\/a|^$/i.test(ssid)) return false;
-						if (/unknown|n\/a|^$/i.test(sig)) return false;
-						return true;
-					}).catch(function() { return false; });
+						if (/unknown|none|n\/a|^$/i.test(ssid)) return { assoc: false };
+						if (/unknown|n\/a|^$/i.test(sig)) return { assoc: false };
+						return { assoc: true, sig: sig, ap: ap, ssid: ssid };
+					}).catch(function() { return { assoc: false }; });
 				}
-				liveCheck.then(function(assoc) {
+				return livePromise.then(function(live) {
 					var wwanIp = '';
 					var dumps = (r[3] && r[3].interface) ? r[3].interface : (Array.isArray(r[3]) ? r[3] : []);
 					dumps.forEach(function(it) {
 						var addrs = (it && (it['ipv4-address'] || it.ipv4_address)) || [];
-						if (it && addrs.length && (it.interface === 'wwan' || it.l3_device === staIfname)) {
+						if (it && addrs.length && (it.interface === 'wwan' || it.l3_device === repState.staIfname)) {
 							wwanIp = addrs[0].address || '';
 						}
 					});
-					var state = 'DISCONNECTED', cls = 'cmk-val-down';
-					if (!staIface) { state = 'NOT CONFIGURED'; }
-					else if (assoc && wwanIp) { state = 'CONNECTED'; cls = 'cmk-val-up'; }
-					else if (assoc) { state = 'CONNECTING'; }
-					var repH = '';
-					repH += '<div class="cmk-grid">';
-					repH += self.statCard('STATUS', state, cls);
-					repH += self.statCard('REMOTE SSID', staIface ? self.esc(staSSID) : 'None');
-					repH += self.statCard('REMOTE IFACE', staIface ? self.esc(staIfname || '-') : '-');
-					repH += self.statCard('REMOTE IP', wwanIp || '-');
-					repH += '</div>';
-					repH += '<p style="color:var(--text-dim);margin-top:15px;font-size:0.8rem">' +
-						'Repeater connects the router to a remote Wi-Fi network and shares your own AP with clients. ' +
-						'Note: this single-radio device shares one radio for both connections, so throughput is reduced.</p>';
-					repH += '<div style="margin-top:15px"><button class="cmk-btn" id="repeater-disconnect" style="border-color:var(--danger);color:var(--danger)">DISCONNECT &amp; STOP REPEATER</button></div>';
-					st.innerHTML = repH;
-					var disco = document.getElementById('repeater-disconnect');
-					if (disco) disco.onclick = function() { self.repeaterDisconnect(); };
-				}).catch(function(e) { if (st) st.innerHTML = '<div class="cmk-alert cmk-alert-warn">' + self.esc(String(e)) + '</div>'; });
-			}).catch(function(e) { if (st) st.innerHTML = '<div class="cmk-alert cmk-alert-warn">' + self.esc(String(e)) + '</div>'; });
+repState.wwanIp = wwanIp;
+					var now = Date.now();
+					var wasConnected = (repState.lastState === 'CONNECTED');
+					var staUp = (staIface && staIface.up === false) ? false : true;
+					var cfgBuf = repState.cfgBuf;
+					if (cfgBuf) staUp = true;
+					if (wasConnected && (staDisabled || !cfgP || !radioUp || !staUp || !live.assoc || !wwanIp)) {
+						if (!repState.dropAt) repState.dropAt = now;
+					} else {
+						repState.dropAt = 0;
+					}
+					// after a user-initiated connect we must not paint CONNECTED from the OLD
+					// session's still-valid lease. As soon as the old link is really broken
+					// (no association) or the live SSID is unknown, the transition is genuine.
+					if (repState.ignoreStale && (!live.assoc || !String(live.ssid || ''))) {
+						repState.ignoreStale = false;
+					}
+					// while we were already CONNECTED and now a live session exists, never claim
+					// CONNECTED if it is the dead weight of the PREVIOUS network (the new link has
+					// not really established yet) or an unknown SSID
+					if (repState.ignoreStale && live.assoc && live.ssid === repState.staSSID) {
+						repState.ignoreStale = false;
+					}
+					if (cfgBuf) {
+						// user-initiated connect is in flight - show target SSID and never degrade below CONNECTING
+						repState.lastState = 'CONNECTING';
+						if (repState.wwanIp && (!live.assoc || !live.ssid || String(live.ssid) !== repState.staSSID)) {
+							repState.wwanIp = '';
+						}
+						paint.call(self, 'CONNECTING', 'cmk-val-mid');
+						if (!live.assoc) {
+							repState.assocSince = 0;
+							repState.lastState = 'CONNECTING';
+							// association has not (yet) happened. A wrong password disables the SSID
+							// (TEMP-DISABLED) between failed handshakes, so detect it from the log
+							// EVEN while disassociated.
+							scanMiss(repState.staSSID || '').then(function(miss) {
+								if (seq !== repState.pollSeq || repState.lastState !== 'CONNECTING') return;
+								if (miss) {
+									repState.lastState = 'NOT FOUND';
+									repState.remoteNote = 'remote network not found in range';
+									repState.cfgBuf = null;
+									paint.call(self, 'NOT FOUND', 'cmk-val-mid');
+									return;
+								}
+								detectAuthFail().then(function(authErr) {
+									if (seq !== repState.pollSeq) return;
+									if (authErr && repState.lastState === 'CONNECTING') {
+										repState.lastState = 'AUTH ERROR';
+										repState.remoteNote = 'authentication rejected by remote AP (wrong password?)';
+										repState.cfgBuf = null;
+										paint.call(self, 'AUTH ERROR', 'cmk-val-down');
+									}
+								});
+							});
+							return;
+						}
+						var liveSsid = String(live.ssid || '');
+						if (liveSsid !== repState.staSSID) {
+							// still associated to the OLD network while switching (or the current
+							// SSID is unknown): the old session is being torn down - flush its IP
+							// and never claim CONNECTED to a connection that is not the target
+							repState.wwanIp = '';
+							repState.assocSince = 0;
+							paint.call(self, 'CONNECTING', 'cmk-val-mid');
+							return;
+						}
+						if (!repState.assocSince) repState.assocSince = now;
+						if (wwanIp) {
+							// a stale IP from the previous session while the new link is being set up
+							if (repState.ignoreStale) {
+								repState.wwanIp = '';
+								repState.assocSince = 0;
+								paint.call(self, 'CONNECTING', 'cmk-val-mid');
+								return;
+							}
+							repState.lastState = 'CONNECTED';
+							repState.remoteNote = '';
+							repState.cfgBuf = null;
+							repState.assocSince = 0;
+							paint.call(self, 'CONNECTED', 'cmk-val-up');
+							return;
+						}
+						// associated to target but no IP: a wrong password fails the 4-way handshake AFTER association
+						detectAuthFail().then(function(authErr) {
+							if (seq !== repState.pollSeq) return;
+							if (authErr) {
+								repState.lastState = 'AUTH ERROR';
+								repState.remoteNote = 'authentication rejected by remote AP (wrong password?)';
+								repState.cfgBuf = null;
+								paint.call(self, 'AUTH ERROR', 'cmk-val-down');
+								return;
+							}
+							if (now - repState.assocSince < ASSOC_GRACE_MS) {
+								repState.lastState = 'CONNECTING';
+								paint.call(self, 'CONNECTING', 'cmk-val-mid');
+								return;
+							}
+							repState.cfgBuf = null;
+							repState.lastState = 'REMOTE ERR';
+							paint.call(self, 'REMOTE ERR', 'cmk-val-down');
+							readWifiTail().then(function(tail) {
+								if (seq !== repState.pollSeq || repState.lastState !== 'REMOTE ERR') return;
+								var note = '';
+								if (/No lease, failing|no lease|udhcpc.*fail|DHCP.*fail/i.test(tail)) note = 'remote DHCP has no lease';
+								else if (/been deauthenticated|disassociated|AP.*rejected|denied/i.test(tail)) note = 'remote host rejected association';
+								if (note) {
+									repState.remoteNote = note;
+									var nEl = st && st.querySelector('.cmk-rep-note');
+									if (nEl) nEl.textContent = self.repNote('REMOTE ERR');
+								}
+							});
+						});
+						return;
+					}
+					if (staDisabled || !cfgP) {
+						repState.lastState = 'DISCONNECTED';
+						repState.remoteNote = '';
+						repState.assocSince = 0;
+						paint.call(self, 'DISCONNECTED', 'cmk-val-down');
+						return;
+					}
+					if (radioUp && staUp) repState.localDownAt = 0;
+					if (!radioUp || !staUp) {
+						if (!repState.localDownAt) repState.localDownAt = now;
+						var downFor = now - repState.localDownAt;
+						if (wasConnected && downFor >= POLL_MS * 3) {
+							repState.lastState = 'DISCONNECTED';
+							repState.remoteNote = '';
+							repState.assocSince = 0;
+							if (typeof console !== 'undefined' && console.warn) console.warn('[cybermiku] repeater locally dropped after CONNECTED', new Error('local radio drop'));
+							paint.call(self, 'DISCONNECTED', 'cmk-val-down');
+							return;
+						}
+						if (downFor > LOCAL_DOWN_GRACE_MS) {
+							repState.lastState = 'DISCONNECTED';
+							repState.remoteNote = '';
+							repState.assocSince = 0;
+							paint.call(self, 'DISCONNECTED', 'cmk-val-down');
+							return;
+						}
+						repState.lastState = 'CONNECTING';
+						paint.call(self, 'CONNECTING', 'cmk-val-mid');
+						return;
+					}
+					if (live.assoc) {
+						var liveSsid = String(live.ssid || '');
+						if (repState.ignoreStale && liveSsid === repState.staSSID) {
+							repState.ignoreStale = false;
+						}
+						// while a new connect is inflight, block CONNECTED from the stale old lease
+						if (repState.ignoreStale) {
+							repState.wwanIp = '';
+							repState.assocSince = 0;
+							repState.lastState = 'CONNECTING';
+							paint.call(self, 'CONNECTING', 'cmk-val-mid');
+							return;
+						}
+						// associated to a different network than configured (drift): flush stale
+						// IP and never report CONNECTED to a foreign session
+						if (repState.staSSID && liveSsid && liveSsid !== repState.staSSID) {
+							repState.wwanIp = '';
+							repState.assocSince = 0;
+							repState.lastState = 'CONNECTING';
+							paint.call(self, 'CONNECTING', 'cmk-val-mid');
+							return;
+						}
+						if (!repState.assocSince) repState.assocSince = now;
+						if (wwanIp) {
+							repState.lastState = 'CONNECTED';
+							repState.remoteNote = '';
+							paint.call(self, 'CONNECTED', 'cmk-val-up');
+							return;
+						}
+						// associated but no IP: wrong password fails the 4-way handshake AFTER association
+						detectAuthFail().then(function(authErr) {
+							if (seq !== repState.pollSeq) return;
+							if (authErr) {
+								repState.lastState = 'AUTH ERROR';
+								repState.remoteNote = 'authentication rejected by remote AP (wrong password?)';
+								paint.call(self, 'AUTH ERROR', 'cmk-val-down');
+								return;
+							}
+							if (now - repState.assocSince < ASSOC_GRACE_MS) {
+								repState.lastState = 'CONNECTING';
+								paint.call(self, 'CONNECTING', 'cmk-val-mid');
+								return;
+							}
+							repState.lastState = 'REMOTE ERR';
+							paint.call(self, 'REMOTE ERR', 'cmk-val-down');
+							readWifiTail().then(function(tail) {
+								if (seq !== repState.pollSeq || repState.lastState !== 'REMOTE ERR') return;
+								var note = '';
+								if (/No lease, failing|no lease|udhcpc.*fail|DHCP.*fail/i.test(tail)) note = 'remote DHCP has no lease';
+								else if (/been deauthenticated|disassociated|AP.*rejected|denied/i.test(tail)) note = 'remote host rejected association';
+								if (note) {
+									repState.remoteNote = note;
+									var nEl = st && st.querySelector('.cmk-rep-note');
+									if (nEl) nEl.textContent = self.repNote('REMOTE ERR');
+								}
+							});
+						});
+						return;
+					}
+					// radio up, not associated - still attempting. Check the log first: on a wrong
+					// password the failures keep recurring, so AUTH ERROR must stay on screen and
+					// must not be hidden by a CONNECTING repaint every poll.
+					repState.assocSince = 0;
+					detectAuthFail().then(function(authErr) {
+						if (seq !== repState.pollSeq) return;
+						if (authErr) {
+							repState.lastState = 'AUTH ERROR';
+							repState.remoteNote = 'authentication rejected by remote AP (wrong password?)';
+							paint.call(self, 'AUTH ERROR', 'cmk-val-down');
+							return;
+						}
+						repState.remoteNote = '';
+						return scanMiss(repState.staSSID || '').then(function(miss) {
+							if (seq !== repState.pollSeq) return;
+							if (miss) {
+								repState.lastState = 'NOT FOUND';
+								repState.remoteNote = 'remote network not found in range';
+								paint.call(self, 'NOT FOUND', 'cmk-val-mid');
+								return;
+							}
+							repState.lastState = 'CONNECTING';
+							paint.call(self, 'CONNECTING', 'cmk-val-mid');
+						});
+					});
+				});
+			}).catch(function(e) {
+				if (st) {
+					var grid = st.querySelector('.cmk-grid');
+					if (grid) {
+						var nEl = st.querySelector('.cmk-rep-note');
+						if (nEl) nEl.textContent = 'Status check failed (' + String(e) + ') - retrying shortly';
+					} else {
+						st.innerHTML = '<div class="cmk-alert cmk-alert-warn">' + self.esc(String(e)) + '</div>';
+						st = null;
+					}
+				}
+			});
+		};
+		var scheduleTick = function() {
+			if (!self._repTimer) return;
+			var iv = (repState.lastState === 'CONNECTED') ? POLL_CONNECTED_MS : POLL_MS;
+			self._repTimer = setTimeout(function() {
+				var ret = loadStatus();
+				if (ret && typeof ret.then === 'function') ret.then(scheduleTick, scheduleTick);
+				else scheduleTick();
+			}, iv);
+		};
+		var startPolling = function() {
+			stopPolling();
+			self._repTimer = setTimeout(function() {
+				var ret = loadStatus();
+				if (ret && typeof ret.then === 'function') ret.then(scheduleTick, scheduleTick);
+				else scheduleTick();
+			}, 0);
+		};
+		var stopPolling = function() {
+			if (self._repTimer) { clearTimeout(self._repTimer); self._repTimer = null; }
+		};
+		this.repNote = function(state) {
+			var n = {
+				'CONNECTED': 'Repeater is up. Clients reach the internet through the remote link.',
+				'CONNECTING': 'Attempting to connect to the remote Wi-Fi network...',
+				'NOT FOUND': 'Remote network "' + repState.staSSID + '" not found in range. Check the SSID.',
+				'AUTH ERROR': 'Authentication was rejected by the remote access point. Check the password.',
+				'REMOTE ERR': 'Remote host problem (no DHCP lease, MAC blocked, or AP refused).',
+				'DISCONNECTED': 'Repeater is not configured or has been stopped.'
+			}[state] || '';
+			if (state === 'CONNECTING' && repState.assocSince) n = 'Associated, waiting for an IP address from the remote DHCP...';
+			if (repState.remoteNote) n = repState.remoteNote;
+			return n;
 		};
 
 		var loadSetup = function() {
@@ -1063,20 +1457,78 @@ var CMK = {
 			h2 += '<div style="margin-bottom:15px"><button class="cmk-btn" id="rep-scan-btn">SCAN FOR NETWORKS</button></div>';
 			h2 += '<div id="rep-scan-results"></div>';
 			h2 += '<div id="rep-connect-form" style="margin-top:15px;border-top:1px solid rgba(0,255,255,0.15);padding-top:15px">';
-			h2 += '<div class="cmk-form-row"><label>REMOTE SSID</label><input type="text" id="rep-ssid" class="cmk-input" placeholder="Type SSID or scan for networks"></div>';
-			h2 += '<div class="cmk-form-row"><label>PASSWORD</label><input type="password" id="rep-key" class="cmk-input" placeholder="Network password"></div>';
+			h2 += '<div class="cmk-form-row"><label>REMOTE SSID</label><input type="text" id="rep-ssid" class="cmk-input" autocomplete="off" placeholder="Type SSID or scan for networks"></div>';
+			h2 += '<div class="cmk-form-row"><label>PASSWORD</label><div class="cmk-pw" style="position:relative;display:flex;align-items:center;width:100%;max-width:420px;box-sizing:border-box">' +
+				'<input type="password" id="rep-key" class="cmk-input" autocomplete="off" placeholder="Network password" style="flex:1 1 auto;min-width:0;width:100%;box-sizing:border-box;padding-right:44px;max-width:420px">' +
+				'<button type="button" class="cmk-eye" id="rep-eye" title="Show / hide password" aria-label="Toggle password visibility" style="position:absolute;right:6px;top:50%;width:32px;height:32px;margin:0;padding:0;transform:translateY(-50%);background:transparent;border:none;border-radius:0;box-shadow:none;color:#00ffff;cursor:pointer">' +
+				'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+				'<path d="M1 12s4-7.5 11-7.5S23 12 23 12s-4 7.5-11 7.5S1 12 1 12z"></path>' +
+				'<circle cx="12" cy="12" r="3"></circle>' +
+				'</svg></button></div>' +
+				'<div class="cmk-caps" id="rep-caps" style="display:none;color:#00ffff">' +
+				'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00ffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+				'<path d="M10.3 3.7L1.8 18.1c-.8 1.4.2 3.2 1.8 3.2h16.8c1.6 0 2.6-1.8 1.8-3.2L13.7 3.7c-.8-1.4-2.7-1.4-3.4 0z"></path>' +
+				'<rect x="10.7" y="7.5" width="2.6" height="7.5" rx="1.3" fill="#00ffff" stroke="none"></rect>' +
+				'<circle cx="12" cy="18" r="1.6" fill="#00ffff" stroke="none"></circle>' +
+				'</svg> CAPS LOCK ACTIVE <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#00ffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+				'<path d="M10.3 3.7L1.8 18.1c-.8 1.4.2 3.2 1.8 3.2h16.8c1.6 0 2.6-1.8 1.8-3.2L13.7 3.7c-.8-1.4-2.7-1.4-3.4 0z"></path>' +
+				'<rect x="10.7" y="7.5" width="2.6" height="7.5" rx="1.3" fill="#00ffff" stroke="none"></rect>' +
+				'<circle cx="12" cy="18" r="1.6" fill="#00ffff" stroke="none"></circle>' +
+				'</svg></div></div>';
 			h2 += '<div class="cmk-form-row"><label>ENCRYPTION</label><select id="rep-enc" class="cmk-input"><option value="psk2">WPA/WPA2 PSK</option><option value="none">None / Open</option></select></div>';
 			h2 += '<button class="cmk-btn" id="rep-connect-btn">CONNECT</button> ';
 			h2 += '<button class="cmk-btn" id="rep-cancel-btn">CLEAR</button>';
 			h2 += '</div>';
 			h2 += '<div id="rep-connect-msg" style="margin-top:15px"></div>';
 			se.innerHTML = h2;
+			var ssidEl = document.getElementById('rep-ssid');
+			var keyEl = document.getElementById('rep-key');
+			var eyeBtn = document.getElementById('rep-eye');
+			var capsEl = document.getElementById('rep-caps');
+			var fillKey = function() {
+				if (!keyEl || keyEl.disabled) return;
+				var s = (ssidEl && ssidEl.value) || '';
+				if (s && pws[s] != null) keyEl.value = pws[s];
+			};
+			if (ssidEl) ssidEl.addEventListener('input', fillKey);
+			if (eyeBtn && keyEl) eyeBtn.onclick = function() {
+				if (keyEl.type === 'password') { keyEl.type = 'text'; eyeBtn.classList.add('cmk-eye-on'); }
+				else { keyEl.type = 'password'; eyeBtn.classList.remove('cmk-eye-on'); }
+			};
+			var updCaps = function(ev) {
+				var on = false;
+				try { on = !!(ev && ev.getModifierState && ev.getModifierState('CapsLock')); } catch (e) { on = false; }
+				if (on) capsLast = true;
+				if (typeof capsLast === 'undefined') capsLast = false;
+				if (capsEl) capsEl.style.display = (on || capsLast) ? '' : 'none';
+			};
+			// heuristic fallback: kbd events in a password field normally arrive lowercase
+			// unless CapsLock (for a lower-case-only keystroke set) - best effort only
+			var capsLast = false, capsEval = function(ev) {
+				try {
+					var k = ev && ev.key;
+					if (typeof k !== 'string' || k.length !== 1) return;
+					var isLetter = /[A-Za-z]/.test(k);
+					if (!isLetter) return;
+					var same = (ev.shiftKey && k === k.toUpperCase()) || (!ev.shiftKey && k === k.toLowerCase());
+					if (same) { capsLast = k === k.toUpperCase(); if (capsEl) capsEl.style.display = capsLast ? '' : 'none'; }
+				} catch (e) { }
+			};
+			if (keyEl) {
+				keyEl.addEventListener('keydown', updCaps);
+				keyEl.addEventListener('keyup', updCaps);
+				keyEl.addEventListener('keypress', updCaps);
+				keyEl.addEventListener('focus', updCaps);
+				keyEl.addEventListener('click', updCaps);
+				keyEl.addEventListener('keydown', capsEval);
+			}
+			pwsLoad();
 			var scanBtn = document.getElementById('rep-scan-btn');
 			if (scanBtn) scanBtn.onclick = function() {
 				var res = document.getElementById('rep-scan-results');
-				if (res) res.innerHTML = '<div class="cmk-loading">SCANNING...</div>';
+				if (!res) return;
 				scanBtn.disabled = true;
-				self.rpc('iwinfo', 'scan', { device: 'phy0' }).then(function(data) {
+				var render = function(data) {
 					scanBtn.disabled = false;
 					if (!res) return;
 					var results = (data && data.results) ? data.results : data;
@@ -1107,13 +1559,24 @@ var CMK = {
 							if (key) { key.value = ''; key.disabled = true; }
 							if (enc) enc.value = 'none';
 						} else {
-							if (key) key.disabled = false;
+							if (key) { key.disabled = false; key.value = ''; }
+							fillKey();
 						}
 					};
 				});
-				}).catch(function(e) {
-					scanBtn.disabled = false;
-					if (res) res.innerHTML = '<div class="cmk-alert cmk-alert-warn">Scan failed: ' + self.esc(String(e)) + '</div>';
+				};
+				var scanOnce = function() {
+					res.innerHTML = '<div class="cmk-loading">SCANNING...</div>';
+					return self.rpc('iwinfo', 'scan', { device: 'phy0' }).then(function(data) {
+						var results = (data && data.results) ? data.results : data;
+						return (results && results.length) ? results : null;
+					}).catch(function() { return null; });
+				};
+				scanOnce().then(function(results) {
+					if (results) { render(results); return; }
+					setTimeout(function() {
+						scanOnce().then(function(second) { render(second); });
+					}, 1500);
 				});
 			};
 			var cancelBtn = document.getElementById('rep-cancel-btn');
@@ -1126,6 +1589,10 @@ var CMK = {
 				if (msg) msg.innerHTML = '';
 			};
 			var connBtn = document.getElementById('rep-connect-btn');
+			var connBtnEl = connBtn;
+			if (keyEl) keyEl.addEventListener('keydown', function(ev) {
+				if (ev.key === 'Enter' && connBtnEl && !connBtnEl.disabled) { ev.preventDefault(); connBtnEl.click(); }
+			});
 			if (connBtn) connBtn.onclick = function() {
 				var ssid = (document.getElementById('rep-ssid') || {}).value || '';
 				var enc = (document.getElementById('rep-enc') || {}).value || 'psk2';
@@ -1136,12 +1603,37 @@ var CMK = {
 				if (enc !== 'none' && !key) { if (msg) msg.innerHTML = '<div class="cmk-alert cmk-alert-warn">Please enter the network password</div>'; return; }
 				if (msg) msg.innerHTML = '<div class="cmk-loading">CONFIGURING REPEATER...</div>';
 				connBtn.disabled = true;
+				repState.cfgBuf = { ssid: ssid, at: Date.now() };
+				repState.cfgP = true;
+				repState.staSSID = ssid;
+				repState.ignoreStale = true;
+				// switching networks tears the current link: drop stale IP/iface instantly
+				repState.wwanIp = '';
+				repState.staIfname = '';
+				repState.assocSince = 0;
+				repState.dropAt = 0;
+				repState.lastState = 'CONNECTING';
+				repState.remoteNote = '';
+				repState.logAt = 0;
+				repState.scanAt = 0;
+				repState.ssidMissing = false;
+				paint.call(self, 'CONNECTING', 'cmk-val-mid');
+				startPolling();
+				setTimeout(function() {
+					try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+				}, 2000);
 				self.repeaterConnect(ssid, enc, key).then(function() {
 					connBtn.disabled = false;
-					if (msg) msg.innerHTML = '<div class="cmk-alert" style="color:var(--success);border-color:var(--success)">Repeater configured successfully. Reconnecting WiFi...</div>';
-					setTimeout(function() { loadStatus(); }, 4000);
+					if (enc !== 'none' && key) {
+						pws[ssid] = key;
+						pwsSave();
+					}
+					var cm = document.getElementById('rep-connect-msg');
+					if (cm && cm.firstChild && cm.firstChild.className === 'cmk-loading') cm.innerHTML = '';
 				}).catch(function(e) {
 					connBtn.disabled = false;
+					repState.cfgBuf = null;
+					repState.ignoreStale = false;
 					if (msg) msg.innerHTML = '<div class="cmk-alert cmk-alert-warn">Failed: ' + self.esc(String(e)) + '</div>';
 				});
 			};
@@ -1259,48 +1751,74 @@ var CMK = {
 			});
 		};
 
-		loadStatus();
+		startPolling();
 		loadSetup();
 		loadAp();
 		loadDns();
 	},
 
+	_repOp: null,
+	_pTimeout: function(p, ms) {
+		return new Promise(function(resolve, reject) {
+			var done = false;
+			var t = setTimeout(function() { if (!done) { done = true; reject(new Error('timeout (' + ms + 'ms)')); } }, ms);
+			p.then(function(r) { if (!done) { done = true; clearTimeout(t); resolve(r); } },
+				function(e) { if (!done) { done = true; clearTimeout(t); reject(e); } });
+		});
+	},
+	_repStep: function(fn) {
+		var self = this;
+		var prev = self._repOp || Promise.resolve();
+		var p = prev.then(fn, fn);
+		var q = p.then(function(r) {
+			if (self._repOp === q) self._repOp = null;
+			return r;
+		}, function(e) {
+			if (self._repOp === q) self._repOp = null;
+			throw e;
+		});
+		self._repOp = q;
+		return q;
+	},
+
 	repeaterConnect: function(ssid, enc, key) {
 		var self = this;
-		var staName = 'wwan_sta';
-		return self.uci('wireless', 'get').then(function(cfg) {
-			var existing = null;
-			for (var sec in cfg) {
-				if (cfg[sec] && cfg[sec].mode === 'sta') { existing = sec; break; }
-			}
-			var chain = Promise.resolve();
-			if (existing) {
-				chain = self.rpc('uci', 'set', { config: 'wireless', section: existing, values: { ssid: ssid, encryption: enc, key: key, network: 'wwan', mode: 'sta', device: 'radio0' } });
-			} else {
-				chain = self.rpc('uci', 'add', { config: 'wireless', type: 'wifi-iface' }).then(function(added) {
-					return self.rpc('uci', 'set', { config: 'wireless', section: added.section, values: { device: 'radio0', mode: 'sta', network: 'wwan', ssid: ssid, encryption: enc, key: key } });
-				});
-			}
-			return chain;
-		}).then(function() {
-			return self.rpc('uci', 'commit', { config: 'wireless' });
-		}).then(function() {
-			return self.uci('network', 'get').then(function(ncfg) {
-				if (!ncfg || !ncfg.wwan) {
-					return self.rpc('uci', 'add', { config: 'network', type: 'interface', name: 'wwan', values: { proto: 'dhcp', peerdns: '0' } }).then(function() {
-						return self.rpc('uci', 'commit', { config: 'network' });
+		return self._repStep(function() {
+			var staName = 'wwan_sta';
+			return self.uci('wireless', 'get').then(function(cfg) {
+				var existing = null;
+				for (var sec in cfg) {
+					if (cfg[sec] && cfg[sec].mode === 'sta') { existing = sec; break; }
+				}
+				var chain = Promise.resolve();
+				if (existing) {
+					chain = self.rpc('uci', 'set', { config: 'wireless', section: existing, values: { ssid: ssid, encryption: enc, key: key, network: 'wwan', mode: 'sta', device: 'radio0' } });
+				} else {
+					chain = self.rpc('uci', 'add', { config: 'wireless', type: 'wifi-iface' }).then(function(added) {
+						return self.rpc('uci', 'set', { config: 'wireless', section: added.section, values: { device: 'radio0', mode: 'sta', network: 'wwan', ssid: ssid, encryption: enc, key: key } });
 					});
 				}
-				return null;
+				return chain;
+			}).then(function() {
+				return self.rpc('uci', 'commit', { config: 'wireless' });
+			}).then(function() {
+				return self.uci('network', 'get').then(function(ncfg) {
+					if (!ncfg || !ncfg.wwan) {
+						return self.rpc('uci', 'add', { config: 'network', type: 'interface', name: 'wwan', values: { proto: 'dhcp', peerdns: '0' } }).then(function() {
+							return self.rpc('uci', 'commit', { config: 'network' });
+						});
+					}
+					return null;
+				});
+			}).then(function() {
+				return self.rsyncFirewallWWAN();
+			}).then(function() {
+				return self._pTimeout(self.rpc('file', 'exec', { command: '/sbin/wifi', params: [] }), 30000).catch(function() {
+					return self._pTimeout(self.rpc('file', 'exec', { command: '/sbin/wifi', params: ['reload'] }), 30000);
+				});
+			}).then(function() {
+				return self._pTimeout(self.rpc('file', 'exec', { command: '/sbin/ifup', params: ['wwan'] }), 30000).catch(function() { return null; });
 			});
-		}).then(function() {
-			return self.rsyncFirewallWWAN();
-		}).then(function() {
-			return self.rpc('file', 'exec', { command: '/sbin/wifi', params: [] }).catch(function(e) {
-				return self.rpc('file', 'exec', { command: '/sbin/wifi', params: ['reload'] });
-			});
-		}).then(function() {
-			return self.rpc('file', 'exec', { command: '/sbin/ifup', params: ['wwan'] }).catch(function() { return null; });
 		});
 	},
 
@@ -1338,30 +1856,38 @@ var CMK = {
 
 	repeaterDisconnect: function() {
 		var self = this;
+		if (self._repTimer) { clearTimeout(self._repTimer); self._repTimer = null; }
+		if (self.repState) {
+			self.repState.cfgBuf = null;
+			self.repState.ignoreStale = false;
+			self.repState.pollSeq = (self.repState.pollSeq || 0) + 1;
+		}
 		var msgDiv = document.getElementById('repeater-status');
 		if (msgDiv) msgDiv.innerHTML = '<div class="cmk-loading">DISCONNECTING REPEATER...</div>';
-		self.uci('wireless', 'get').then(function(cfg) {
-			var toDelete = [];
-			for (var sec in cfg) {
-				if (cfg[sec] && (cfg[sec].mode === 'sta')) toDelete.push(sec);
-			}
-			var chain = Promise.resolve();
-			toDelete.forEach(function(sec) {
-				chain = chain.then(function() { return self.rpc('uci', 'delete', { config: 'wireless', section: sec }).catch(function() { return null; }); });
-			});
-			return chain.then(function() { return self.rpc('uci', 'commit', { config: 'wireless' }); });
-		}).then(function() {
-			return self.uci('network', 'get').then(function(ncfg) {
-				if (ncfg && ncfg.wwan) {
-					return self.rpc('uci', 'delete', { config: 'network', section: 'wwan' }).then(function() {
-						return self.rpc('uci', 'commit', { config: 'network' });
-					});
+		return self._repStep(function() {
+			return self.uci('wireless', 'get').then(function(cfg) {
+				var toDelete = [];
+				for (var sec in cfg) {
+					if (cfg[sec] && (cfg[sec].mode === 'sta')) toDelete.push(sec);
 				}
-				return null;
-			});
-		}).then(function() {
-			return self.rpc('file', 'exec', { command: '/sbin/wifi', params: [] }).catch(function(e) {
-				return self.rpc('file', 'exec', { command: '/sbin/wifi', params: ['reload'] });
+				var chain = Promise.resolve();
+				toDelete.forEach(function(sec) {
+					chain = chain.then(function() { return self.rpc('uci', 'delete', { config: 'wireless', section: sec }).catch(function() { return null; }); });
+				});
+				return chain.then(function() { return self.rpc('uci', 'commit', { config: 'wireless' }); });
+			}).then(function() {
+				return self.uci('network', 'get').then(function(ncfg) {
+					if (ncfg && ncfg.wwan) {
+						return self.rpc('uci', 'delete', { config: 'network', section: 'wwan' }).then(function() {
+							return self.rpc('uci', 'commit', { config: 'network' });
+						});
+					}
+					return null;
+				});
+			}).then(function() {
+				return self._pTimeout(self.rpc('file', 'exec', { command: '/sbin/wifi', params: [] }), 30000).catch(function() {
+					return self._pTimeout(self.rpc('file', 'exec', { command: '/sbin/wifi', params: ['reload'] }), 30000);
+				});
 			});
 		}).then(function() {
 			var msgDiv2 = document.getElementById('repeater-status');
@@ -1541,7 +2067,7 @@ var CMK = {
 		var self = this;
 		switch (sub) {
 			case 'info': self.sysInfo(c); break;
-			case 'password': self.sysPassword(c); break;
+			case 'password': window.location.href = '/cgi-bin/luci/admin/system/admin'; break;
 			case 'leds': self.sysLEDs(c); break;
 			case 'cron': self.sysCron(c); break;
 			case 'backup': self.sysBackup(c); break;
@@ -1624,36 +2150,6 @@ var CMK = {
 
 	sysReboot: function() {
 		this.rpc('system', 'reboot').catch(function() {});
-	},
-
-	sysPassword: function(c) {
-		var self = this;
-		c.innerHTML = '<div class="cmk-panel"><div class="cmk-panel-title">CHANGE PASSWORD</div>' +
-			'<div style="max-width:400px">' +
-			'<label class="cmk-label">NEW PASSWORD</label>' +
-			'<input type="password" id="pw-new" class="cmk-input" style="width:100%">' +
-			'<label class="cmk-label">CONFIRM</label>' +
-			'<input type="password" id="pw-confirm" class="cmk-input" style="width:100%">' +
-			'<button class="cmk-btn" id="pw-set" style="margin-top:15px">SET PASSWORD</button>' +
-			'<div id="pw-result" style="margin-top:10px"></div>' +
-			'</div></div>';
-		var btn = document.getElementById('pw-set');
-		if (btn) btn.onclick = function() {
-			var pw = document.getElementById('pw-new').value;
-			var pwc = document.getElementById('pw-confirm').value;
-			var res = document.getElementById('pw-result');
-			if (!pw || pw !== pwc) {
-				if (res) res.innerHTML = '<span style="color:var(--danger)">Passwords do not match</span>';
-				return;
-			}
-			self.rpc('luci', 'setPassword', { password: pw }).then(function() {
-				if (res) res.innerHTML = '<span style="color:var(--success)">Password changed</span>';
-				document.getElementById('pw-new').value = '';
-				document.getElementById('pw-confirm').value = '';
-			}).catch(function(e) {
-				if (res) res.innerHTML = '<span style="color:var(--danger)">Error: ' + self.esc(String(e)) + '</span>';
-			});
-		};
 	},
 
 	sysLEDs: function(c) {

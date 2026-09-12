@@ -13,8 +13,24 @@
 		<title>{{ striptags(`${boardinfo.hostname ?? '?'}${node ? ` - ${node.title}` : ''}`) }} - LuCI</title>
 		<meta name="viewport" content="initial-scale=1.0">
 		<link rel="stylesheet" href="/luci-static/bootstrap/cascade.css">
-		<link rel="stylesheet" href="{{ media }}/cascade.css">
-		<link rel="stylesheet" href="{{ media }}/cybermiku.css">
+		<link rel="stylesheet" href="{{ media }}/cascade.css?v=20260908f">
+		<link rel="stylesheet" href="{{ media }}/cybermiku.css?v=20260908d">
+		<style>
+			@font-face {
+				font-family: 'Orbitron';
+				font-style: normal;
+				font-weight: 100 900;
+				font-display: swap;
+				src: url('{{ media }}/fonts/Orbitron.woff2') format('woff2');
+			}
+			@font-face {
+				font-family: 'Share Tech Mono';
+				font-style: normal;
+				font-weight: 400;
+				font-display: swap;
+				src: url('{{ media }}/fonts/ShareTechMono.woff2') format('woff2');
+			}
+		</style>
 		<link rel="icon" href="{{ media }}/favicon.ico" type="image/x-icon">
 		{% if (node?.css): %}
 		<link rel="stylesheet" href="{{ resource }}/{{ node.css }}">

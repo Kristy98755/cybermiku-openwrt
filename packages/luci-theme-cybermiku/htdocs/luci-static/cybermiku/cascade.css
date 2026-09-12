@@ -1,6 +1,20 @@
 /* CyberMiku Theme for LuCI 24.10 */
 
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+/* Local fonts (Orbitron variable 100-900, Share Tech Mono 400) */
+@font-face {
+	font-family: 'Orbitron';
+	font-style: normal;
+	font-weight: 100 900;
+	font-display: swap;
+	src: url('fonts/Orbitron.woff2') format('woff2');
+}
+@font-face {
+	font-family: 'Share Tech Mono';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('fonts/ShareTechMono.woff2') format('woff2');
+}
 
 :root {
 	--cyan: #00ffff;

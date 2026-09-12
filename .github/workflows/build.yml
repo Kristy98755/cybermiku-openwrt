@@ -24,9 +24,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            build-essential clang bison flex g++ gettext texinfo ncurses-dev \
+            build-essential clang bison flex g++ gettext texinfo libncurses-dev \
             zlib1g-dev libssl-dev python3 python3-pip python3-dev unzip file \
-            wget rsync svn cmake ninja-build gawk bc git ca-certificates \
+            wget rsync subversion cmake ninja-build gawk bc git ca-certificates \
             xxd perl-base libtool-bin autoconf automake make
 
       - name: Bootstrap and build firmware

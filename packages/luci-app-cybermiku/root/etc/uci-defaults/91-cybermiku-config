@@ -9,9 +9,9 @@ uci set wireless.radio0.disabled='0'
 # Set default WiFi SSID
 uci set wireless.default_radio0.ssid='Miku Hiding in Your Wi-Fi'
 
-# Set WiFi to WPA2 by default
-uci set wireless.default_radio0.encryption='psk2'
-uci set wireless.default_radio0.key='changeme123'
+# Open network by default so users can connect over the air before setup
+uci set wireless.default_radio0.encryption='none'
+uci set wireless.default_radio0.key=''
 
 # Set timezone to Moscow
 uci set system.@system[0].timezone='MSK-3'
