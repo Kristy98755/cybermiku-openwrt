@@ -50,11 +50,18 @@ cybermiku-openwrt/
 │   └── luci-app-cybermiku/        # контроллеры, cbi, acl, uci-defaults
 ├── config/
 │   ├── cybermiku.config           # openwrt .config (ужатый под 8 МБ)
+│   ├── wr840n-v6.config           # openwrt .config для TL-WR840N v6.2 (4 МБ)
 │   └── refs.env                   # пины: openwrt + фиды (sha1)
+├── files/
+│   └── wr840n-v6/                 # поддержка TL-WR840N v6.2 (ramips/mt76x8)
+│       ├── mt7628an_tplink_tl-wr840n-v6.2.dts   # DTS (партиции, LED, GPIO)
+│       ├── apply.py               # патчит дерево openwrt (mk + board.d)
+│       ├── setup.sh               # обёртка над apply.py
+│       └── build.sh               # полная сборка под 4 МБ
 ├── patches/
 │   └── 001-feeds-packages-lws-ttyd.patch   # lws-mbedtls + ttyd
 ├── scripts/
-│   └── build.sh                   # скрипт полной сборки
+│   └── build.sh                   # скрипт полной сборки (ath79)
 └── .github/workflows/build.yml    # CI: сборка + релиз при деплое
 ```
 
@@ -84,7 +91,43 @@ OPENWRT_DIR=/work/openwrt bash scripts/build.sh
 
 ---
 
-## <span style="color:#FF00E8">🔷 Установка · Install / Flash</span>
+## <span style="color:#FF00E8">🔷 TL-WR840N v6.2 (4 МБ) · ramips/mt76x8</span>
+
+**RU:** Ветка `wr840n-v6` — та же cybermiku, но под **TP-Link TL-WR840N v6.2**
+(`ramips/mt76x8`, флеш **4 МБ**, RAM 32 МБ). Официальный OpenWrt эту версию не
+поддерживает, поэтому в дерево добавлены DTS, запись устройства и правила сети
+(`files/wr840n-v6/`). Жёсткий лимит образа — **3968 КБ** (kernel + squashfs),
+поэтому конфиг ужат: без ppp, без IPv6, без opkg, `wpad-basic-mbedtls`,
+`ttyd` + `libwebsockets-mbedtls`.
+
+**EN:** Branch `wr840n-v6` — same cybermiku for the **TP-Link TL-WR840N v6.2**
+(`ramips/mt76x8`, **4 MB** flash, 32 MB RAM). That revision is not supported
+upstream, so `files/wr840n-v6/` carries the DTS, the device entry and the
+network rules. Hard image limit is **3968 KB**, hence the trimmed config.
+
+### Сборка · Build
+
+```bash
+# дерево openwrt уже клонировано и запинено (см. config/refs.env)
+bash files/wr840n-v6/build.sh              # OPENWRT_TREE=$HOME/openwrt-build
+# артефакты: ~/openwrt-build/bin/targets/ramips/mt76x8/
+#   openwrt-ramips-mt76x8-tplink_tl-wr840n-v6.2-squashfs-sysupgrade.bin
+```
+
+`build.sh` копирует `packages/*` в `package/custom`, прогоняет `apply.py`
+(добавляет поддержку v6.2 в дерево), ставит `config/wr840n-v6.config`,
+делает `make defconfig` и собирает `make -j`.
+
+### Прошивка · Flash (с 19.07 → 24.10)
+
+```sh
+scp openwrt-...-sysupgrade.bin root@192.168.1.1:/tmp/
+# -F: другой branch/openwrt, board_name совпадает ("tplink,tl-wr840n-v6.2")
+# -n: чистая конфигурация (19.07 -> 24.10 конфиги несовместимы)
+ssh root@192.168.1.1 'sysupgrade -F -n /tmp/openwrt-...-sysupgrade.bin'
+```
+
+
 
 **RU:** Всегда делайте бэкап конфига!
 
