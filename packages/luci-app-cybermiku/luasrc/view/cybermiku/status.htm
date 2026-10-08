@@ -1,11 +1,12 @@
 <%+header%>
+<% local sys = require "luci.sys" %>
 
 <div class="cyber-panel">
 	<h2><%:System Information%></h2>
 	<div class="cyber-grid">
 		<div class="cyber-stat">
 			<div class="cyber-stat-label"><%:Hostname%></div>
-			<div class="cyber-stat-value"><%= sys.exec("uci get system.@system[0].hostname"):match("^%s*(.-)%s*$") or "OpenWrt" %></div>
+			<div class="cyber-stat-value"><%=((sys.exec("uci get system.@system[0].hostname 2>/dev/null") or ""):match("^%s*(.-)%s*$")) or "OpenWrt"%></div>
 		</div>
 		<div class="cyber-stat">
 			<div class="cyber-stat-label"><%:Model%></div>

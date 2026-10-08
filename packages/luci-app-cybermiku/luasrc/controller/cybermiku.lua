@@ -10,7 +10,23 @@ function index()
 	entry({"admin", "cybermiku", "api", "status"}, call("action_status"), nil).leaf = true
 	entry({"admin", "cybermiku", "api", "clients"}, call("action_clients"), nil).leaf = true
 	entry({"admin", "cybermiku", "api", "reboot"}, call("action_reboot"), nil).leaf = true
+	entry({"admin", "cybermiku", "api", "password"}, call("action_password"), nil).leaf = true
 	entry({"admin", "cybermiku", "logout"}, call("action_logout"), _("Logout"), 100).leaf = true
+end
+
+function action_password()
+	local http = require "luci.http"
+	local sys = require "luci.sys"
+
+	local pw1 = http.formvalue("pw1")
+	local pw2 = http.formvalue("pw2")
+
+	if pw1 and pw1 == pw2 and #pw1 >= 5 then
+		sys.user.setpasswd("root", pw1)
+		http.redirect(luci.dispatcher.build_url("admin", "cybermiku", "system") .. "?pw=1")
+	else
+		http.redirect(luci.dispatcher.build_url("admin", "cybermiku", "system") .. "?pw=err")
+	end
 end
 
 function action_logout()
@@ -21,6 +37,7 @@ function action_logout()
 			conn:call("session", "destroy", { ubus_rpc_session = luci.dispatcher.context.authsession })
 		end
 	end
+	luci.http.header("Set-Cookie", "sysauth=; max-age=0; path=/cgi-bin/luci/")
 	luci.http.header("Set-Cookie", "sysauth_http=; max-age=0; path=/cgi-bin/luci/")
 	luci.http.redirect(luci.dispatcher.build_url("admin", "cybermiku"))
 end

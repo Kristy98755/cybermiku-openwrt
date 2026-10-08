@@ -9,7 +9,7 @@ PKG_MAINTAINER:=CyberMiku <admin@cybermiku.local>
 
 LUCI_TITLE:=CyberMiku Control Panel
 LUCI_PKGARCH:=all
-LUCI_DEPENDS:=+luci-base +uhttpd +rpcd
+LUCI_DEPENDS:=+luci-base +luci-compat +luci-theme-cybermiku +uhttpd +rpcd
 
 include $(TOPDIR)/feeds/luci/luci.mk
 

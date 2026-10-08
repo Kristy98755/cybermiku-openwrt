@@ -16,8 +16,9 @@ uci set wireless.default_radio0.key=''
 # Set timezone to Moscow
 uci set system.@system[0].timezone='MSK-3'
 
-# Remove Lua SGI prefix so /cgi-bin/luci uses ucode dispatcher (same theme as /)
-uci delete uhttpd.main.lua_prefix 2>/dev/null
+# NOTE: do not touch uhttpd.main.lua_prefix - on OpenWrt 21.02 the Lua SGI
+# (option lua_prefix '/cgi-bin/luci') IS the dispatcher; removing it would
+# break /cgi-bin/luci entirely.
 
 # Save changes
 uci commit

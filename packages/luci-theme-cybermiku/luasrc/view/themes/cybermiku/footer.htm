@@ -1,0 +1,20 @@
+<%#
+	CyberMiku theme footer - OpenWrt 21.02 (Lua template port of footer.ut)
+-%>
+
+		<% if not blank_page then %>
+		<%   local ver = require "luci.version" %>
+		</div>
+		<footer>
+			<span style="color:#008b8b;font-size:0.7rem;letter-spacing:2px;">
+				CYBERMIKU // Powered by
+				<a href="https://github.com/openwrt/luci" target="_blank" style="color:#39c5bb;"><%=ver.luciname or "LuCI"%></a>
+				/
+				<a href="<%=pcdata(ver.disturl or "#")%>" target="_blank" style="color:#39c5bb;"><%=ver.distname or ""%> <%=ver.distversion or ""%></a>
+			</span>
+			<ul class="breadcrumb pull-right" id="modemenu" style="display:none"></ul>
+		</footer>
+		<script type="text/javascript">L.require('menu-bootstrap')</script>
+		<% end %>
+	</body>
+</html>

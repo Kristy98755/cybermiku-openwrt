@@ -2,6 +2,9 @@
 # Build a cybermiku image for TP-Link TL-WR840N v6.2 (ramips/mt76x8, 4 MB).
 # usage: build.sh [config-file]   (runs inside the OpenWrt build tree)
 set -euo pipefail
+# WSL launches this from Windows: Windows PATH entries (e.g. "Program Files")
+# break find -execdir during package/install, so keep a clean Linux PATH.
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/lib/wsl/lib
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../.." && pwd)"
 tree="${OPENWRT_TREE:-$HOME/openwrt-build}"
