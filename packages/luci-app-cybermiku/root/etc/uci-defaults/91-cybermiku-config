@@ -20,6 +20,17 @@ uci set system.@system[0].timezone='MSK-3'
 # (option lua_prefix '/cgi-bin/luci') IS the dispatcher; removing it would
 # break /cgi-bin/luci entirely.
 
+# Steady LEDs (no activity blinking):
+# - wlan: phy0tpt blinks on any wifi packet (broadcast noise at idle);
+#   netdev link = solid while radio is on
+# - lan/wan: switch trigger defaults to link+tx+rx = blinks on port traffic;
+#   mode link = solid while cable is connected
+uci set system.led_wlan2g.trigger='netdev'
+uci set system.led_wlan2g.dev='wlan0'
+uci set system.led_wlan2g.mode='link'
+uci set system.led_lan.mode='link'
+uci set system.led_wan.mode='link'
+
 # Save changes
 uci commit
 
