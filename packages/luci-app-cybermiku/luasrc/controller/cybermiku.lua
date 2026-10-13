@@ -11,6 +11,7 @@ function index()
 	entry({"admin", "cybermiku", "api", "clients"}, call("action_clients"), nil).leaf = true
 	entry({"admin", "cybermiku", "api", "reboot"}, call("action_reboot"), nil).leaf = true
 	entry({"admin", "cybermiku", "api", "password"}, call("action_password"), nil).leaf = true
+	entry({"admin", "cybermiku", "api", "vpn", "gate"}, call("action_vpn_gate"), nil).leaf = true
 	entry({"admin", "cybermiku", "logout"}, call("action_logout"), _("Logout"), 100).leaf = true
 end
 
@@ -140,4 +141,91 @@ end
 function action_reboot()
 	luci.http.status(200, "Rebooting...")
 	luci.sys.reboot()
+end
+
+function action_vpn_gate()
+	local http = require "luci.http"
+	local sys = require "luci.sys"
+	local jsonc = require "luci.jsonc"
+
+	local cache = "/tmp/vpngate_cache.json"
+	local ttl = 600
+
+	local fresh = sys.exec("find " .. cache .. " -mmin -" .. math.floor(ttl / 60) .. " 2>/dev/null | head -1")
+	if fresh and fresh ~= "" then
+		local f = io.open(cache, "r")
+		if f then
+			local c = f:read("*a")
+			f:close()
+			if c and #c > 2 then
+				http.prepare_content("application/json")
+				http.write(c)
+				return
+			end
+		end
+	end
+
+	local errlog = "/tmp/vpngate_err.log"
+	local csv = sys.exec("uclient-fetch -T 20 -O /tmp/vpngate_raw.csv 'http://www.vpngate.net/api/iphone/' > " .. errlog .. " 2>&1; echo EXIT=$? >> " .. errlog .. "; cat /tmp/vpngate_raw.csv 2>/dev/null")
+	if not csv or #csv < 100 then
+		local detail = sys.exec("cat " .. errlog .. " 2>/dev/null | head -5")
+		sys.exec("rm -f /tmp/vpngate_raw.csv")
+		http.status(502, "Fetch failed")
+		http.prepare_content("application/json")
+		http.write_json({ error = "failed to fetch VPN Gate list", detail = detail, len = #(csv or "") })
+		return
+	end
+	sys.exec("rm -f /tmp/vpngate_raw.csv " .. errlog)
+
+	local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+
+	local servers = {}
+	for line in csv:gmatch("[^\r\n]+") do
+		if not line:match("^%*") then
+			local p = {}
+			for field in (line .. ","):gmatch("([^,]*),") do
+				table.insert(p, trim(field))
+			end
+			local ovpn_b64
+			for k = #p, 1, -1 do
+				if #p[k] > 200 then ovpn_b64 = p[k]; break end
+			end
+			if p[2] and p[2] ~= "" and ovpn_b64 then
+				table.insert(servers, {
+					hostname = p[1] or "",
+					ip = p[2],
+					score = tonumber(p[3]) or 0,
+					ping = p[4] or "",
+					speed = tonumber(p[5]) or 0,
+					country = p[6] or "",
+					country_code = p[7] or "",
+					sessions = tonumber(p[8]) or 0,
+					uptime = p[9] or "",
+					ovpn_b64 = ovpn_b64
+				})
+			end
+		end
+	end
+
+	local prio = { RU = 0, KZ = 1 }
+	table.sort(servers, function(a, b)
+		local pa = prio[a.country_code] or 2
+		local pb = prio[b.country_code] or 2
+		if pa ~= pb then return pa < pb end
+		return a.score > b.score
+	end)
+
+	local result = {}
+	for i = 1, math.min(25, #servers) do
+		table.insert(result, servers[i])
+	end
+
+	local cf = io.open(cache, "w")
+	if cf then
+		cf:write(jsonc.stringify(result) or "[]")
+		cf:close()
+	end
+
+	http.prepare_content("application/json")
+	http.write(jsonc.stringify(result) or "[]")
 end

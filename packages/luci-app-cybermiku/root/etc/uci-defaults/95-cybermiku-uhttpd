@@ -1,0 +1,11 @@
+#!/bin/sh
+# CyberMiku: VPN Gate fetch can take 60-90s over the slow uplink
+# (1.3 MB CSV, stalls). uhttpd default script_timeout=60 kills the CGI
+# before LuCI answers ("did not produce any response" -> browser
+# "Failed to fetch"). Raise to 300s so a cold fetch always completes.
+if [ "$(uci -q get uhttpd.main.script_timeout)" != "300" ]; then
+	uci set uhttpd.main.script_timeout='300'
+	uci commit uhttpd
+	/etc/init.d/uhttpd restart
+fi
+exit 0
