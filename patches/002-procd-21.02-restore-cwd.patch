@@ -1,0 +1,38 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: cybermiku <cybermiku@local>
+Date: Tue, 13 Oct 2026 16:10:00 +0300
+Subject: [PATCH] state: always restore cwd after set_stdio
+
+set_stdio() chains its conditions with short-circuit OR, so when any
+freopen() fails (e.g. /dev/console open returns ENXIO on a system
+without a working console) the trailing chdir("/") is never executed
+and procd's working directory stays at /dev forever.
+
+During sysupgrade, procd chroots into the RAM prefix and execs
+upgraded, which performs chroot("."). Since cwd lies outside the
+current root, this resets the root directory to the stale cwd (/dev),
+so execvp("/lib/upgrade/stage2") resolves to /dev/lib/upgrade/stage2,
+fails with ENOENT, the upgrade aborts and the device reboots without
+writing the image.
+
+Always restore the cwd to / even when redirecting stdio fails.
+---
+ state.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/state.c b/state.c
+--- a/state.c
++++ b/state.c
+@@ -48,8 +48,10 @@
+ 	if (chdir("/dev") ||
+ 	    !freopen(tty, "r", stdin) ||
+ 	    !freopen(tty, "w", stdout) ||
+-	    !freopen(tty, "w", stderr) ||
+-	    chdir("/"))
++	    !freopen(tty, "w", stderr)) {
++		ERROR("failed to set stdio: %m\n");
++		chdir("/");
++	} else if (chdir("/"))
+ 		ERROR("failed to set stdio: %m\n");
+ 	else
+ 		fcntl(STDERR_FILENO, F_SETFL, fcntl(STDERR_FILENO, F_GETFL) | O_NONBLOCK);

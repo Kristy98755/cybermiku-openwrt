@@ -59,7 +59,8 @@ cybermiku-openwrt/
 │       ├── setup.sh               # обёртка над apply.py
 │       └── build.sh               # полная сборка под 4 МБ
 ├── patches/
-│   └── 001-feeds-packages-lws-ttyd.patch   # lws-mbedtls + ttyd
+│   ├── 001-feeds-packages-lws-ttyd.patch   # lws-mbedtls + ttyd
+│   └── 002-procd-21.02-restore-cwd.patch   # фикс sysupgrade на 21.02
 ├── scripts/
 │   └── build.sh                   # скрипт полной сборки (ath79)
 └── .github/workflows/build.yml    # CI: сборка + релиз при деплое
@@ -127,7 +128,16 @@ scp openwrt-...-sysupgrade.bin root@192.168.1.1:/tmp/
 ssh root@192.168.1.1 'sysupgrade -F -n /tmp/openwrt-...-sysupgrade.bin'
 ```
 
-
+> ⚠️ **RU:** устройства на **21.02** (sergoops) не могут сделать sysupgrade: сломан
+> `chdir("/")` в procd (`set_stdio()`), `chroot(".")` в `upgraded` сбрасывает корень
+> на `/dev`, `stage2` не запускается — ребут **без записи образа**. Прошивайте напрямую
+> (TFTP-recovery либо `mtd write`) образом 21.02, собранным с
+> `patches/002-procd-21.02-restore-cwd.patch` — после этого sysupgrade работает, и
+> переход на 24.10 идёт обычным путём. В 24.10 баг уже исправлен апстримом (procd `patch_fd`).
+>
+> **EN:** on 21.02 sysupgrade aborts without writing the image (procd cwd bug).
+> Flash a 21.02 image built with patch 002 directly (TFTP-recovery / `mtd write`);
+> after that sysupgrade works and the 24.10 migration is routine. Upstream fixed it in 24.10.
 
 **RU:** Всегда делайте бэкап конфига!
 
