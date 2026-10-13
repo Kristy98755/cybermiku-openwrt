@@ -1,0 +1,27 @@
+#!/bin/sh
+# CyberMiku: WiFi repeater client to uplink "Home Sweet Home"
+# (2.4 GHz, ch 3, WPA2-PSK; uplink subnet 192.168.0.0/24 vs LAN 192.168.1.0/24).
+# Runs on every boot AFTER the sysupgrade config restore, so these settings win.
+# Stable netdev name wwan0 via ifname= (order-independent across boots).
+
+uci set network.wwan=interface
+uci set network.wwan.proto='dhcp'
+uci set network.wwan.device='wwan0'
+uci set network.wwan.peerdns='1'
+
+uci set wireless.radio0.channel='3'
+uci set wireless.sta1=wifi-iface
+uci set wireless.sta1.device='radio0'
+uci set wireless.sta1.mode='sta'
+uci set wireless.sta1.network='wwan'
+uci set wireless.sta1.ssid='Home Sweet Home'
+uci set wireless.sta1.encryption='psk2'
+uci set wireless.sta1.key='@*s%h+r8'
+uci set wireless.sta1.ifname='wwan0'
+
+uci -q add_list firewall.@zone[1].network='wwan'
+
+uci commit network
+uci commit wireless
+uci commit firewall
+exit 0

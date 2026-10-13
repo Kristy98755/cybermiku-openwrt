@@ -1,0 +1,11 @@
+#!/bin/sh
+# CyberMiku: resolve via the uplink's DNS (peerdns on wwan writes
+# /tmp/resolv.conf.d/resolv.conf.auto). No hardcoded resolvers — drop the
+# legacy 8.8.8.8/1.1.1.1 + noresolv=1 pinning if an old config carried it.
+if [ -n "$(uci -q get dhcp.@dnsmasq[0].server)" ] || [ "$(uci -q get dhcp.@dnsmasq[0].noresolv)" != "0" ]; then
+	uci -q delete dhcp.@dnsmasq[0].server
+	uci set dhcp.@dnsmasq[0].noresolv='0'
+	uci commit dhcp
+	/etc/init.d/dnsmasq restart
+fi
+exit 0
