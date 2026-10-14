@@ -92,6 +92,7 @@ var CMK = {
 			'          <a href="#network-clients">CLIENTS</a>',
 			'          <a href="#network-routes">ROUTES</a>',
 			'          <a href="#network-diag">DIAGNOSTICS</a>',
+			'          <a href="#network-vpn">VPN</a>',
 			'        </div></li>',
 			'      <li data-tab="wireless"><a href="#wireless-overview">WIRELESS</a>',
 			'        <div class="cmk-dropdown" data-submenu="wireless">',
@@ -575,6 +576,7 @@ var CMK = {
 			case 'clients': self.netClients(c); break;
 			case 'routes': self.netRoutes(c); break;
 			case 'diag': self.netDiag(c); break;
+			case 'vpn': self.netVpn(c); break;
 			default: self.netInterfaces(c);
 		}
 	},
@@ -1562,6 +1564,9 @@ repState.wwanIp = wwanIp;
 							if (key) { key.disabled = false; key.value = ''; }
 							fillKey();
 						}
+						var form = document.getElementById('rep-connect-form');
+						if (form) form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+						if (ssid) setTimeout(function(){ ssid.focus(); }, 400);
 					};
 				});
 				};
@@ -2213,12 +2218,37 @@ repState.wwanIp = wwanIp;
 	sysShell: function(c) {
 		var self = this;
 		var h = '<div class="cmk-panel"><div class="cmk-panel-title">SHELL</div>';
-		h += '<p class="cmk-note">INTEGRATED WEB TERMINAL (TTYD). RUNS AS ROOT — FULL CONTROL. MODIFY ONLY WHAT YOU UNDERSTAND.</p>';
-		h += '<iframe class="cmk-shell-frame" src="' + ttydUrl() + '" title="Terminal"></iframe>';
-		h += '<p class="cmk-note">WEB TERMINAL ON PORT 7681. AUTH: router ROOT USER / PASSWORD.</p>';
-		h += '<p class="cmk-note"><a href="' + ttydUrl() + '" target="_blank">OPEN IN NEW TAB</a></p>';
+		h += '<p class="cmk-note">WEB TERMINAL (WSSH). RUNS AS ROOT — FULL CONTROL. MODIFY ONLY WHAT YOU UNDERSTAND.</p>';
+		h += '<div id="wssh-term" style="background:#000;color:#0f0;font-family:monospace;font-size:13px;padding:10px;height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;border:1px solid #333;border-radius:4px;cursor:text"></div>';
+		h += '<input id="wssh-input" type="text" placeholder="Type command and press Enter..." style="width:100%;margin-top:8px;padding:8px;background:#111;color:#0f0;border:1px solid #333;border-radius:4px;font-family:monospace;font-size:13px;box-sizing:border-box" autocomplete="off" spellcheck="false">';
+		h += '<p class="cmk-note" id="wssh-status">DISCONNECTED</p>';
 		h += '</div>';
 		c.innerHTML = h;
+		self.wsshInit();
+	},
+
+	wsshInit: function() {
+		var t=document.getElementById('wssh-term'),i=document.getElementById('wssh-input'),s=document.getElementById('wssh-status'),w=null,h=[],hi=-1;
+		if(!t||!i)return;
+		function ap(d){t.textContent+=d;t.scrollTop=t.scrollHeight;}
+		function ss(x,c){if(s){s.textContent=x;s.style.color=c||'#888';}}
+		function cn(){
+			var u=(location.protocol==='https:'?'wss://':'ws://')+location.hostname+':7681/ws';
+			ss('CONNECTING...','#ff0');
+			try{w=new WebSocket(u);}catch(e){ss('ERR','#f00');return;}
+			w.binaryType='arraybuffer';
+			w.onopen=function(){ss('CONNECTED','#0f0');ap('\r\n[connected]\r\n');i.focus();};
+			w.onmessage=function(e){ap(typeof e.data==='string'?e.data:new TextDecoder().decode(e.data));};
+			w.onclose=function(e){ss('DISCONNECTED'+(e&&e.code?' ('+e.code+')':'')+' - RETRY 3S','#f80');setTimeout(cn,3e3);};
+			w.onerror=function(){ss('CONN ERROR','#f00');};
+		}
+		i.addEventListener('keydown',function(e){
+			if(e.key==='Enter'){var c=i.value;if(w&&w.readyState===1){w.send(c+'\n');if(c.trim()){h.push(c);hi=h.length;}}ap('$ '+c+'\r\n');i.value='';}
+			else if(e.key==='ArrowUp'){e.preventDefault();if(hi>0){hi--;i.value=h[hi]||'';}}
+			else if(e.key==='ArrowDown'){e.preventDefault();if(hi<h.length-1){hi++;i.value=h[hi]||'';}else{hi=h.length;i.value='';}}
+		});
+		t.addEventListener('click',function(){i.focus();});
+		cn();
 	},
 
 	sysBackup: function(c) {
@@ -2279,6 +2309,400 @@ repState.wwanIp = wwanIp;
 
 	diagTraceroute: function(c) {
 		this.diagRun(c, 'TRACEROUTE', '/bin/traceroute', function(host) { return ['-m', '15', host]; });
+	},
+
+
+	netVpn: function(c) {
+		var self = this;
+		c.innerHTML =
+			'<div class="cmk-panel"><div class="cmk-panel-title">OPENVPN</div>' +
+			'<div id="vpn-ovpn-status" class="cmk-loading">CHECKING</div>' +
+			'<div id="vpn-ovpn-form"></div></div>' +
+			'<div class="cmk-panel"><div class="cmk-panel-title">REDSOCKS (SOCKS PROXY)</div>' +
+			'<div id="vpn-rs-status" class="cmk-loading">CHECKING</div>' +
+			'<div id="vpn-rs-form"></div></div>' +
+			'<div class="cmk-panel"><div class="cmk-panel-title">VPN GATE SERVERS</div>' +
+			'<div style="margin-bottom:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+			'<button class="cmk-btn-sm" id="vpn-gate-refresh">REFRESH LIST</button>' +
+			'<select id="vpn-gate-country" class="cmk-input" style="width:130px">' +
+			'<option value="">All countries</option>' +
+			'<option value="RU">Russia</option>' +
+			'<option value="KZ">Kazakhstan</option>' +
+			'</select>' +
+			'<span id="vpn-gate-count" style="color:var(--text-dim,#888);font-size:12px"></span>' +
+			'</div>' +
+			'<div id="vpn-gate-list"><div class="cmk-loading">LOADING</div></div></div>';
+
+		var ovpnConfPath = '/etc/openvpn/my-vpn.conf';
+		var rsConfPath = '/etc/redsocks.conf';
+
+		function fmtUciBool(v) { return v === '1' || v === 1 || v === true; }
+
+		function b64decode(s) {
+			try { return decodeURIComponent(escape(atob(s))); } catch(e) { return s; }
+		}
+		function b64encode(s) {
+			try { return btoa(unescape(encodeURIComponent(s))); } catch(e) { return btoa(s); }
+		}
+		function fileRead(path) {
+			return self.rpc('file', 'read', { path: path }).then(function(data) {
+				if (data == null) return '';
+				if (typeof data === 'string') return data;
+				if (data.data != null) return String(data.data);
+				return '';
+			}).catch(function() { return ''; });
+		}
+		function fileWrite(path, content) {
+			return self.rpc('file', 'write', { path: path, data: content });
+		}
+
+		function loadOpenvpn() {
+			var elS = document.getElementById('vpn-ovpn-status');
+			var elF = document.getElementById('vpn-ovpn-form');
+			if (!elF) return;
+
+			Promise.all([
+				self.uci('openvpn', 'get'),
+				self.rpc('file', 'exec', { command: '/bin/pidof', params: ['openvpn'] }).catch(function() { return { stdout: '', stderr: '' }; }),
+				fileRead(ovpnConfPath)
+			]).then(function(r) {
+				var uciCfg = r[0] || {};
+				var custom = uciCfg.custom_config || {};
+				var enabled = fmtUciBool(custom.enabled);
+				var running2 = !!(r[1] && String(r[1].stdout || '').trim());
+
+				var confData = r[2] || '';
+				if (elS) {
+					elS.innerHTML = '<span class="cmk-badge ' + (enabled ? 'cmk-badge-on' : 'cmk-badge-off') + '">' +
+						(enabled ? 'ENABLED' : 'DISABLED') + '</span> ' +
+						'<span class="cmk-badge ' + (running2 ? 'cmk-badge-on' : 'cmk-badge-off') + '">' +
+						(running2 ? 'RUNNING' : 'STOPPED') + '</span>';
+				}
+
+				var h = '';
+				h += '<label style="display:block;margin:10px 0"><input type="checkbox" id="vpn-ovpn-enable" ' + (enabled ? 'checked' : '') + '> Enable OpenVPN client (uses /etc/openvpn/my-vpn.conf)</label>';
+				h += '<p class="cmk-note">Paste an OpenVPN client config below (e.g. from vpngate.net — choose an OpenVPN server, copy the config text).</p>';
+				h += '<textarea id="vpn-ovpn-conf" class="cmk-input" style="width:100%;min-height:180px;font-family:monospace;font-size:12px" placeholder="client&#10;dev tun&#10;proto udp&#10;remote SERVER_IP PORT&#10;...">' + self.esc(confData || '') + '</textarea>';
+				h += '<div style="margin-top:10px">';
+				h += '<button class="cmk-btn" id="vpn-ovpn-save">SAVE &amp; APPLY</button> ';
+				h += '<button class="cmk-btn-sm" id="vpn-ovpn-start">START</button> ';
+				h += '<button class="cmk-btn-sm" id="vpn-ovpn-stop">STOP</button> ';
+				h += '<button class="cmk-btn-sm" id="vpn-ovpn-restart">RESTART</button>';
+				h += '</div>';
+				h += '<div id="vpn-ovpn-msg"></div>';
+				elF.innerHTML = h;
+
+				var msg = function(text, ok) {
+					var m = document.getElementById('vpn-ovpn-msg');
+					if (m) m.innerHTML = '<div class="cmk-alert" style="margin-top:10px;color:' + (ok ? 'var(--success)' : 'var(--error)') + ';border-color:' + (ok ? 'var(--success)' : 'var(--error)') + '">' + self.esc(text) + '</div>';
+				};
+
+				document.getElementById('vpn-ovpn-save').onclick = function() {
+					var en = document.getElementById('vpn-ovpn-enable').checked;
+					var content = document.getElementById('vpn-ovpn-conf').value;
+					var btn = this;
+					btn.disabled = true;
+					btn.textContent = 'SAVING...';
+
+					var writeP = Promise.resolve();
+					if (content && content.trim()) {
+						writeP = fileWrite(ovpnConfPath, content);
+					}
+
+					writeP.then(function() {
+						return self.uci('openvpn', 'set', { section: 'custom_config', values: { enabled: en ? '1' : '0' } });
+					}).then(function() {
+						return self.uci('openvpn', 'commit');
+					}).then(function() {
+						return self.rpc('file', 'exec', { command: '/etc/init.d/openvpn', params: [en ? 'restart' : 'stop'] });
+					}).then(function() {
+						btn.disabled = false;
+						btn.textContent = 'SAVE & APPLY';
+						msg('Saved. OpenVPN ' + (en ? 'restarted' : 'stopped') + '.', true);
+						setTimeout(loadOpenvpn, 1500);
+					}).catch(function(e) {
+						btn.disabled = false;
+						btn.textContent = 'SAVE & APPLY';
+						msg('Error: ' + e, false);
+					});
+				};
+
+				document.getElementById('vpn-ovpn-start').onclick = function() {
+					self.rpc('file', 'exec', { command: '/etc/init.d/openvpn', params: ['start'] }).then(function() {
+						msg('Start requested.', true);
+						setTimeout(loadOpenvpn, 1500);
+					}).catch(function(e) { msg('Error: ' + e, false); });
+				};
+				document.getElementById('vpn-ovpn-stop').onclick = function() {
+					self.rpc('file', 'exec', { command: '/etc/init.d/openvpn', params: ['stop'] }).then(function() {
+						msg('Stop requested.', true);
+						setTimeout(loadOpenvpn, 1500);
+					}).catch(function(e) { msg('Error: ' + e, false); });
+				};
+				document.getElementById('vpn-ovpn-restart').onclick = function() {
+					self.rpc('file', 'exec', { command: '/etc/init.d/openvpn', params: ['restart'] }).then(function() {
+						msg('Restart requested.', true);
+						setTimeout(loadOpenvpn, 1500);
+					}).catch(function(e) { msg('Error: ' + e, false); });
+				};
+			}).catch(function(e) {
+				if (elF) elF.innerHTML = '<div class="cmk-alert">Error loading OpenVPN: ' + self.esc(String(e)) + '</div>';
+			});
+		}
+
+		function loadRedsocks() {
+			var elS = document.getElementById('vpn-rs-status');
+			var elF = document.getElementById('vpn-rs-form');
+			if (!elF) return;
+
+			Promise.all([
+				fileRead(rsConfPath),
+				self.rpc('file', 'exec', { command: '/bin/pidof', params: ['redsocks'] }).catch(function() { return null; })
+			]).then(function(r) {
+				var confData = r[0] || '';
+				var running = !!(r[1] && String(r[1].stdout || '').trim());
+
+				// parse existing redsocks{} block loosely
+				var localIp = '127.0.0.1', localPort = '12345', ip = '', port = '1080', type = 'socks5', login = '', password = '';
+				var mBlock = confData.match(/redsocks\s*\{([^}]*)\}/);
+				if (mBlock) {
+					var b = mBlock[1];
+					var g = function(k) { var mm = b.match(new RegExp(k + '\\s*=\\s*"?([^";\\n]+)"?')); return mm ? mm[1].trim() : null; };
+					localIp = g('local_ip') || localIp;
+					localPort = g('local_port') || localPort;
+					ip = g('ip') || '';
+					port = g('port') || port;
+					type = g('type') || type;
+					login = g('login') || '';
+					password = g('password') || '';
+				}
+
+				if (elS) {
+					elS.innerHTML = '<span class="cmk-badge ' + (confData ? 'cmk-badge-on' : 'cmk-badge-off') + '">' +
+						(confData ? 'CONFIGURED' : 'NO CONFIG') + '</span> ' +
+						'<span class="cmk-badge ' + (running ? 'cmk-badge-on' : 'cmk-badge-off') + '">' +
+						(running ? 'RUNNING' : 'STOPPED') + '</span>';
+				}
+
+				var h = '';
+				h += '<p class="cmk-note">Transparent SOCKS proxy. Point LAN traffic through a SOCKS5/4 server (e.g. free KZ/RU proxy).</p>';
+				h += '<div class="cmk-grid cols-2" style="gap:10px">';
+				h += '<div><label>Proxy host / IP</label><input type="text" id="vpn-rs-ip" class="cmk-input" style="width:100%" value="' + self.esc(ip) + '" placeholder="proxy.example.com or 1.2.3.4"></div>';
+				h += '<div><label>Proxy port</label><input type="text" id="vpn-rs-port" class="cmk-input" style="width:100%" value="' + self.esc(port) + '"></div>';
+				h += '<div><label>Type</label><select id="vpn-rs-type" class="cmk-input" style="width:100%">' +
+					'<option value="socks5"' + (type === 'socks5' ? ' selected' : '') + '>SOCKS5</option>' +
+					'<option value="socks4"' + (type === 'socks4' ? ' selected' : '') + '>SOCKS4</option>' +
+					'<option value="http-connect"' + (type === 'http-connect' ? ' selected' : '') + '>HTTP CONNECT</option>' +
+					'<option value="http-relay"' + (type === 'http-relay' ? ' selected' : '') + '>HTTP RELAY</option>' +
+					'</select></div>';
+				h += '<div><label>Local redirect port</label><input type="text" id="vpn-rs-lport" class="cmk-input" style="width:100%" value="' + self.esc(localPort) + '"></div>';
+				h += '<div><label>Login (optional)</label><input type="text" id="vpn-rs-login" class="cmk-input" style="width:100%" value="' + self.esc(login) + '"></div>';
+				h += '<div><label>Password (optional)</label><input type="password" id="vpn-rs-pass" class="cmk-input" style="width:100%" value="' + self.esc(password) + '"></div>';
+				h += '</div>';
+				h += '<div style="margin-top:12px">';
+				h += '<button class="cmk-btn" id="vpn-rs-save">SAVE &amp; APPLY</button> ';
+				h += '<button class="cmk-btn-sm" id="vpn-rs-start">START</button> ';
+				h += '<button class="cmk-btn-sm" id="vpn-rs-stop">STOP</button> ';
+				h += '<button class="cmk-btn-sm" id="vpn-rs-restart">RESTART</button>';
+				h += '</div>';
+				h += '<div id="vpn-rs-msg"></div>';
+				h += '<p class="cmk-note" style="margin-top:10px">After saving, add a firewall redirect: traffic destined to TCP 80/443 → 127.0.0.1:LOCAL_PORT, or use iptables manually.</p>';
+				elF.innerHTML = h;
+
+				var msg = function(text, ok) {
+					var m = document.getElementById('vpn-rs-msg');
+					if (m) m.innerHTML = '<div class="cmk-alert" style="margin-top:10px;color:' + (ok ? 'var(--success)' : 'var(--error)') + ';border-color:' + (ok ? 'var(--success)' : 'var(--error)') + '">' + self.esc(text) + '</div>';
+				};
+
+				document.getElementById('vpn-rs-save').onclick = function() {
+					var pip = document.getElementById('vpn-rs-ip').value.trim();
+					var pport = document.getElementById('vpn-rs-port').value.trim();
+					var ptype = document.getElementById('vpn-rs-type').value;
+					var lport = document.getElementById('vpn-rs-lport').value.trim();
+					var plogin = document.getElementById('vpn-rs-login').value.trim();
+					var ppass = document.getElementById('vpn-rs-pass').value;
+
+					if (!pip) { msg('Proxy host is required.', false); return; }
+
+					var conf = 'base {\n\tlog_debug = off;\n\tlog_info = on;\n\tlog = "syslog:local7";\n\tdaemon = on;\n\tredirector = iptables;\n}\n\n' +
+						'redsocks {\n\tlocal_ip = 127.0.0.1;\n\tlocal_port = ' + lport + ';\n\tip = ' + pip + ';\n\tport = ' + pport + ';\n\ttype = ' + ptype + ';\n';
+					if (plogin) conf += '\tlogin = "' + plogin + '";\n';
+					if (ppass) conf += '\tpassword = "' + ppass + '";\n';
+					conf += '}\n';
+
+					var btn = this;
+					btn.disabled = true;
+					btn.textContent = 'SAVING...';
+
+					var writeP = fileWrite(rsConfPath, conf);
+
+					writeP.then(function() {
+						return self.rpc('file', 'exec', { command: '/etc/init.d/redsocks', params: ['restart'] });
+					}).then(function() {
+						btn.disabled = false;
+						btn.textContent = 'SAVE & APPLY';
+						msg('Saved and restarted redsocks.', true);
+						setTimeout(loadRedsocks, 1500);
+					}).catch(function(e) {
+						btn.disabled = false;
+						btn.textContent = 'SAVE & APPLY';
+						msg('Error: ' + e, false);
+					});
+				};
+
+				document.getElementById('vpn-rs-start').onclick = function() {
+					self.rpc('file', 'exec', { command: '/etc/init.d/redsocks', params: ['start'] }).then(function() {
+						msg('Start requested.', true);
+						setTimeout(loadRedsocks, 1500);
+					}).catch(function(e) { msg('Error: ' + e, false); });
+				};
+				document.getElementById('vpn-rs-stop').onclick = function() {
+					self.rpc('file', 'exec', { command: '/etc/init.d/redsocks', params: ['stop'] }).then(function() {
+						msg('Stop requested.', true);
+						setTimeout(loadRedsocks, 1500);
+					}).catch(function(e) { msg('Error: ' + e, false); });
+				};
+				document.getElementById('vpn-rs-restart').onclick = function() {
+					self.rpc('file', 'exec', { command: '/etc/init.d/redsocks', params: ['restart'] }).then(function() {
+						msg('Restart requested.', true);
+						setTimeout(loadRedsocks, 1500);
+					}).catch(function(e) { msg('Error: ' + e, false); });
+				};
+			}).catch(function(e) {
+				if (elF) elF.innerHTML = '<div class="cmk-alert">Error loading redsocks: ' + self.esc(String(e)) + '</div>';
+			});
+		}
+
+
+		function loadVpnGate() {
+			var el = document.getElementById('vpn-gate-list');
+			var elCount = document.getElementById('vpn-gate-count');
+			if (!el) return;
+
+			// inject styles once
+			if (!document.getElementById('vpn-gate-style')) {
+				var st = document.createElement('style');
+				st.id = 'vpn-gate-style';
+				st.textContent =
+					'.vpn-gate-item{border:1px solid rgba(255,255,255,.12);margin-bottom:6px;border-radius:6px;overflow:hidden}' +
+					'.vpn-gate-header{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;background:rgba(255,255,255,.03);flex-wrap:wrap}' +
+					'.vpn-gate-header:hover{background:rgba(0,255,255,.06)}' +
+					'.vpn-gate-flag{font-size:16px}' +
+					'.vpn-gate-cc{font-weight:bold;font-size:13px;min-width:28px}' +
+					'.vpn-gate-ip{font-family:monospace;font-size:12px;color:#aaa}' +
+					'.vpn-gate-speed{color:#0ff;font-size:12px;margin-left:auto}' +
+					'.vpn-gate-sessions{font-size:12px;color:#8c8}' +
+					'.vpn-gate-toggle{font-size:18px;font-weight:bold;width:22px;text-align:center;color:#0ff}' +
+					'.vpn-gate-details{padding:10px 12px;border-top:1px solid rgba(255,255,255,.1);background:rgba(0,0,0,.25);font-size:13px}' +
+					'.vpn-gate-details p{margin:4px 0}' +
+					'.vpn-gate-badge{display:inline-block;padding:2px 8px;border-radius:3px;font-size:11px;font-weight:bold}' +
+					'.vpn-gate-badge-ru{background:#1a4a1a;color:#4f4}' +
+					'.vpn-gate-badge-kz{background:#1a3a4a;color:#4ff}' +
+					'.vpn-gate-badge-other{background:#444;color:#ccc}';
+				document.head.appendChild(st);
+			}
+
+			function render(servers) {
+				CMK._vpnGateServers = servers || [];
+				var filter = (document.getElementById('vpn-gate-country') || {}).value || '';
+				var visible = [];
+				for (var i = 0; i < CMK._vpnGateServers.length; i++) {
+					var s = CMK._vpnGateServers[i];
+					if (!filter || s.country_code === filter) visible.push({ s: s, idx: i });
+				}
+				if (elCount) elCount.textContent = visible.length + ' servers shown';
+				if (!visible.length) {
+					el.innerHTML = '<div class="cmk-alert cmk-alert-warn">No servers' + (filter ? ' for ' + self.esc(filter) : '') + '</div>';
+					return;
+				}
+				var h = '';
+				for (var j = 0; j < visible.length; j++) {
+					var s2 = visible[j].s;
+					var idx = visible[j].idx;
+					var flag = s2.country_code === 'RU' ? '\uD83C\uDDF7\uD83C\uDDFA' : s2.country_code === 'KZ' ? '\uD83C\uDDF0\uD83C\uDDFF' : '\uD83C\uDF10';
+					var badgeCls = s2.country_code === 'RU' ? 'ru' : s2.country_code === 'KZ' ? 'kz' : 'other';
+					var mbps = Math.round((s2.speed || 0) / 1000);
+					h += '<div class="vpn-gate-item">';
+					h += '<div class="vpn-gate-header" onclick="CMK.vpnGateToggle(this)">';
+					h += '<span class="vpn-gate-flag">' + flag + '</span>';
+					h += '<span class="vpn-gate-badge vpn-gate-badge-' + badgeCls + '">' + self.esc(s2.country_code || '?') + '</span>';
+					h += '<span class="vpn-gate-ip">' + self.esc(s2.ip) + '</span>';
+					h += '<span class="vpn-gate-speed">' + mbps + ' Mbps</span>';
+					h += '<span class="vpn-gate-sessions">' + (s2.sessions || 0) + ' sess</span>';
+					h += '<span class="vpn-gate-toggle">+</span>';
+					h += '</div>';
+					h += '<div class="vpn-gate-details" style="display:none">';
+					h += '<p><b>Country:</b> ' + self.esc(s2.country || '?') + '</p>';
+					h += '<p><b>Hostname:</b> ' + self.esc(s2.hostname || '-') + '</p>';
+					h += '<p><b>Score:</b> ' + (s2.score || 0) + ' &nbsp; <b>Ping:</b> ' + self.esc(String(s2.ping || '-')) + ' ms</p>';
+					h += '<p><b>Uptime:</b> ' + self.esc(s2.uptime || '-') + ' &nbsp; <b>Users:</b> ' + (s2.sessions || 0) + '</p>';
+					h += '<div style="margin-top:8px"><button class="cmk-btn" onclick="CMK.vpnGateUse(' + idx + ')">USE THIS SERVER</button></div>';
+					h += '</div></div>';
+				}
+				el.innerHTML = h;
+			}
+
+			function fetchList() {
+				el.innerHTML = '<div class="cmk-loading">FETCHING FROM VPN GATE...</div>';
+				fetch('/cgi-bin/luci/admin/cybermiku/api/vpn/gate', { credentials: 'same-origin' })
+					.then(function(r) { return r.json(); })
+					.then(function(data) {
+						if (data && data.error) {
+							var msg = self.esc(data.error);
+							if (data.detail) msg += '<pre style="margin-top:6px;font-size:11px;color:#fa0;white-space:pre-wrap">' + self.esc(data.detail) + '</pre>';
+							el.innerHTML = '<div class="cmk-alert">' + msg + '</div>';
+							return;
+						}
+						render(data);
+					})
+					.catch(function(e) {
+						el.innerHTML = '<div class="cmk-alert">Error: ' + self.esc(String(e)) + '</div>';
+					});
+			}
+
+			var refreshBtn = document.getElementById('vpn-gate-refresh');
+			if (refreshBtn) refreshBtn.onclick = fetchList;
+			var countrySel = document.getElementById('vpn-gate-country');
+			if (countrySel) countrySel.onchange = function() { render(CMK._vpnGateServers || []); };
+
+			fetchList();
+		}
+
+		loadOpenvpn();
+		loadRedsocks();
+		loadVpnGate();
+	},
+
+
+	vpnGateToggle: function(header) {
+		var item = header.parentElement;
+		var details = item.querySelector('.vpn-gate-details');
+		var toggle = header.querySelector('.vpn-gate-toggle');
+		if (details) {
+			var open = details.style.display !== 'none';
+			details.style.display = open ? 'none' : 'block';
+			if (toggle) toggle.textContent = open ? '+' : '\u2212';
+		}
+	},
+
+	vpnGateUse: function(idx) {
+		var s = (this._vpnGateServers || [])[idx];
+		if (!s || !s.ovpn_b64) return;
+		var conf;
+		try {
+			conf = decodeURIComponent(escape(atob(s.ovpn_b64)));
+		} catch(e) {
+			try { conf = atob(s.ovpn_b64); } catch(e2) { alert('Cannot decode config'); return; }
+		}
+		var ta = document.getElementById('vpn-ovpn-conf');
+		if (ta) {
+			ta.value = conf;
+			ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+			ta.style.outline = '2px solid #0ff';
+			setTimeout(function() { ta.style.outline = ''; }, 2500);
+		}
+		var en = document.getElementById('vpn-ovpn-enable');
+		if (en && !en.checked) en.checked = true;
 	},
 
 	// ============================================================

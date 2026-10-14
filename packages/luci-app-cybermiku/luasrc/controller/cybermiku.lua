@@ -215,8 +215,16 @@ function action_vpn_gate()
 		return a.score > b.score
 	end)
 
+	-- RU/KZ first (all of them, even beyond the cap), then fill up to 25
+	-- with the best of the rest so the UA country filter is never empty.
+	local n_prio = 0
+	for i = 1, #servers do
+		if prio[servers[i].country_code] then n_prio = i else break end
+	end
+	local cap = math.max(25, n_prio)
+
 	local result = {}
-	for i = 1, math.min(25, #servers) do
+	for i = 1, math.min(cap, #servers) do
 		table.insert(result, servers[i])
 	end
 
